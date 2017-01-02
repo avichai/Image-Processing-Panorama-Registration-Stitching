@@ -4,7 +4,17 @@ from scipy.misc import imread as imread
 from skimage.color import rgb2gray
 from scipy import signal as sig
 from scipy.ndimage.filters import convolve
+from scipy.ndimage import map_coordinates
 import os
+from ex4 import sol4_add
+
+DEF_M = 7
+
+DEF_N = 7
+
+DEFAULT_DESC_RAD = 3
+
+ORIG_IM = 0
 
 IDENTITY_KERNEL_SIZE = 1
 BINOMIAL_MAT = [0.5, 0.5]
@@ -17,6 +27,9 @@ LARGEST_IM_INDEX = 0
 DIM_RGB = 3
 DER_VEC = [1, 0, -1]
 DEFAULT_KER_SIZE = 3
+DEFAULT_K = 0.4
+FIRST_EIG_VAL_IND = 0
+SEC_EIG_VAL_IND = 0
 
 
 def read_image(filename, representation):
@@ -257,20 +270,6 @@ def conv_der(im):
     return derX.astype(np.float32), derY.astype(np.float32)
 
 
-def getRespons(M, imShape):
-    print(imShape)
-    print(M.shape)
-    for row in imShape[ROWS]:
-        for col in imShape[COLS]:
-            mPerPoint = [M[0][ROWS][COLS], M[1][ROWS][COLS],
-                         M[2][ROWS][COLS], M[3][ROWS][COLS]]
-            print(mPerPoint.shape)
-
-
-    eigenValues, eigenVectores = np.linalg.eig(M)
-    print(eigenValues)
-    pass
-
 def harris_corner_detector(im):
     '''
     Finding haris point of interest
@@ -283,8 +282,74 @@ def harris_corner_detector(im):
     bluredSquaredDerY = blur_spatial(np.multiply(derY, derY), DEFAULT_KER_SIZE)
     bluredDerXderY = blur_spatial(np.multiply(derX, derY), DEFAULT_KER_SIZE)
 
+    R = np.multiply(bluredSquaredDerX, bluredSquaredDerY) - \
+        np.multiply(bluredDerXderY, bluredDerXderY)
 
-    M = np.array([[bluredSquaredDerX, bluredDerXderY],
-                  [bluredDerXderY, bluredSquaredDerY]])
+    locMax = sol4_add.non_maximum_suppression(R)
+    row, col = np.where(locMax == True)
 
-    respone = getRespons(M, im.shape)
+    pos = np.zeros((row.shape[0], 2))
+    pos[:, 0] = row
+    pos[:, 1] = col
+
+    # plt.figure()
+    # plt.imshow(im, cmap=plt.cm.gray)
+    # plt.scatter(col, row, marker='.')
+    # plt.figure()
+    # plt.imshow(R, cmap=plt.cm.gray)
+    # plt.figure()
+    # plt.imshow(locMax, cmap=plt.cm.gray)
+    # plt.show()
+
+    return pos
+
+
+def sample_descriptor(im, pos, desc_rad):
+    '''
+    find the descriptors for the points given.
+    :param im: grayscale image to sample within
+    :param pos:  An array with shape (N,2) of [x,y] positions to
+    sample descriptors in im.
+    :param desc_rad: ”Radius” of descriptors to compute (see below).
+    :return: A 3D array with shape (K,K,N) containing the ith descriptor
+    at desc(:,:,i). The per−descriptor dimensions KxK
+    are related to the desc rad argument as follows K = 1+2∗desc rad.
+    '''
+
+    patchSize = 2*desc_rad + 1
+    N = pos.shape[0]
+    patches = np.zeros((patchSize, patchSize, N))
+    print(im.shape)
+    xCoord = np.zeros(patchSize**2)
+    yCoord = np.zeros( patchSize**2)
+    for i in range(N):
+        pljX = 0.25*pos[i][ROWS]
+        pljY = 0.25*pos[i][COLS]
+        for j in range(patchSize):
+            for k in range(patchSize):
+                xCoord[j*patchSize + k] = pljX - desc_rad + j
+                yCoord[j + k*patchSize] = pljY - desc_rad + j
+        patches[:, :, i] = map_coordinates(im, [xCoord, yCoord],
+                                         order=1).reshape(patchSize, patchSize)
+
+    return patches
+
+
+
+
+
+def find_features(pyr):
+    '''
+    find features and descriptors.
+    :param pyr: Gaussian pyramid of a grayscale image having 3 levels.
+    :return:
+    pos − An array with shape (N,2) of [x,y] feature location per row found
+    in the (third pyramid level of the) image. These coordinates are
+    provided at the pyramid level pyr[0].
+    desc − A feature descriptor array with shape (K,K,N).
+
+    '''
+    pos = sol4_add.spread_out_corners(pyr[ORIG_IM], DEF_N, DEF_M) # todo what is radius???
+    pos = harris_corner_detector(pyr[ORIG_IM])
+    desc = sample_descriptor(pyr[2], pos, DEFAULT_DESC_RAD)
+    return pos, desc
