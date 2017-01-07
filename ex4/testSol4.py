@@ -7,7 +7,7 @@ INLIER_TOL = 6
 
 DEF_NUM_ITER = 100
 
-DEF_MIN_SCORE = 0.7
+DEF_MIN_SCORE = 0.0
 
 def testHarris(im):
 
@@ -138,7 +138,7 @@ def testRansac(im1):
 def display_matches(im1):
     # im2 = sol4.read_image('external/backyard1.jpg', 1)
 
-    im2 = sol4.read_image('external/office4.jpg', 1)
+    im2 = sol4.read_image('external/office3.jpg', 1)
 
     pyr1, filter1 = sol4.build_gaussian_pyramid(im1, 3, 3)
     pos1, desc1 = sol4.find_features(pyr1)
@@ -277,6 +277,7 @@ def cutImages(im):
 # testSampleDesc
 # testFindFeatures
 # testMatchFeatures
+# display_matches
 # testAppHom
 # testRansac
 # testAccHom
@@ -286,8 +287,8 @@ def cutImages(im):
 def main():
     try:
         # im = sol4.read_image('external/backyard1.jpg', 1)
-        im = sol4.read_image('external/office1.jpg', 1)
-        for test in [testRenderPan]:
+        im = sol4.read_image('external/office2.jpg', 1)
+        for test in [testMatchFeatures]:
             test(im)
     except Exception as e:
         print('Failed test due to: {0}'.format(e))

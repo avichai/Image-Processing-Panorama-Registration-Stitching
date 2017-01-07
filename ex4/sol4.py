@@ -18,15 +18,16 @@ ROWS = 0
 COLS = 1
 LARGEST_IM_INDEX = 0
 DIM_RGB = 3
-DER_VEC = [1, 0, -1]
+DER_VEC = np.array([1, 0, -1])[np.newaxis]
 DEFAULT_KER_SIZE = 3
-DEFAULT_K = 0.4
+DEFAULT_K = 0.04
 FIRST_EIG_VAL_IND = 0
 SEC_EIG_VAL_IND = 0
 ORIG_IM = 0
-DEFAULT_DESC_RAD = 5
+DEFAULT_DESC_RAD = 3
+DEFAULT_RADIUS = 10
 DEF_N = 7
-DEF_M = 11
+DEF_M = 7
 
 
 def read_image(filename, representation):
@@ -253,18 +254,18 @@ def blur_spatial(im, kernel_size):
         np.float32)
 
 
-def conv_der(im):
-    '''
-    getting the derivative of an image using convolution
-    :param im:  grayscale images of type float32.
-    :return:  X and Y derivative of an image.
-    ima.
-    '''
-    maskX = np.array(DER_VEC, ndmin=2)
-    maskY = np.transpose(maskX)
-    derX = sig.convolve(im, maskX, mode='same')
-    derY = sig.convolve(im, maskY, mode='same')
-    return derX.astype(np.float32), derY.astype(np.float32)
+# def conv_der(im):
+#     '''
+#     getting the derivative of an image using convolution
+#     :param im:  grayscale images of type float32.
+#     :return:  X and Y derivative of an image.
+#     ima.
+#     '''
+#     maskX = np.array(DER_VEC, ndmin=2)
+#     maskY = np.transpose(maskX)
+#     derX = sig.convolve(im, maskX, mode='same')
+#     derY = sig.convolve(im, maskY, mode='same')
+#     return derX.astype(np.float32), derY.astype(np.float32)
 
 
 def harris_corner_detector(im):
@@ -273,64 +274,155 @@ def harris_corner_detector(im):
     :param im: grayscale image to find key points inside
     :return: An array with shape (N,2) of [x,y] key points locations in im
     '''
-    derX, derY = conv_der(im)
+    # derX1, derY2 = conv_der(im)
+    # print(derX1)
+    derX = convolve(im, DER_VEC)
+    derY = convolve(im, np.transpose(DER_VEC))
+    # print(derX1 == derX)
 
     bluredSquaredDerX = blur_spatial(np.multiply(derX, derX), DEFAULT_KER_SIZE)
     bluredSquaredDerY = blur_spatial(np.multiply(derY, derY), DEFAULT_KER_SIZE)
     bluredDerXderY = blur_spatial(np.multiply(derX, derY), DEFAULT_KER_SIZE)
 
-    R = np.multiply(bluredSquaredDerX, bluredSquaredDerY) - \
-        np.multiply(bluredDerXderY, bluredDerXderY)
+    det = np.multiply(bluredSquaredDerX, bluredSquaredDerY) - \
+          np.multiply(bluredDerXderY, bluredDerXderY)
+    trace = bluredSquaredDerX + bluredSquaredDerY
+
+    R = det - DEFAULT_K*(np.multiply(trace, trace))
 
     locMax = sol4_add.non_maximum_suppression(R)
-    y, x = np.where(locMax == True)
 
-    pos = np.zeros((x.shape[0], 2))
-    pos[:, 0] = x
-    pos[:, 1] = y
+    tmpP = np.argwhere(locMax)
 
-    return pos
+    points = tmpP[:, [1, 0]]
 
+    return points
+
+
+# def sample_descriptor(im, pos, desc_rad):
+#     '''
+#     find the descriptors for the points given.
+#     :param im: grayscale image to sample within
+#     :param pos:  An array with shape (N,2) of [x,y] positions to
+#     sample descriptors in im.
+#     :param desc_rad: ”Radius” of descriptors to compute (see below).
+#     :return: A 3D array with shape (K,K,N) containing the ith descriptor
+#     at desc(:,:,i). The per−descriptor dimensions KxK
+#     are related to the desc rad argument as follows K = 1+2∗desc rad.
+#     '''
+#
+#     patchSize = 2 * desc_rad + 1
+#     N = pos.shape[0]
+#     patches = np.zeros((patchSize, patchSize, N))
+#     xCoord = np.zeros(patchSize ** 2)
+#     yCoord = np.zeros(patchSize ** 2)
+#     c = 0
+#     for i in range(N):
+#         pljX = 0.25 * pos[i][ROWS]
+#         pljY = 0.25 * pos[i][COLS]
+#         for j in range(patchSize):
+#             for k in range(patchSize):
+#                 xCoord[j * patchSize + k] = pljX - desc_rad + j
+#                 yCoord[j + k * patchSize] = pljY - desc_rad + j
+#         patchI = map_coordinates(im, [xCoord, yCoord],
+#                                  order=1, prefilter=False).reshape(patchSize,
+#                                                                    patchSize)
+#         meanI = np.mean(patchI)
+#         patchI -= meanI
+#         normI = np.linalg.norm(patchI)
+#         if normI == 0:
+#             patches[:, :, i] = np.zeros((patchSize, patchSize))
+#             continue
+#
+#         patchI /= np.linalg.norm(patchI)
+#         patches[:, :, i] = patchI
+#     return patches
+
+
+# def sample_descriptor(im, pos, desc_rad):
+#     """
+#     :param im: grayscale image to sample within
+#     :param pos: An array with shape (N,2) of [x,y] positions to sample descriptors in im
+#     :param desc_rad: ”Radius” of descriptors to compute
+#     :return: A 3D array with shape (K,K,N) containing the ith descriptor at desc(:,:,i).
+#              The per−descriptor dimensions KxK are related to the desc rad argument as follows
+#              K = 1+2∗desc rad.
+#     """
+#     # calculating the descriptor's diameter and size
+#     desc_diam = 2 * desc_rad + 1
+#     desc_size = desc_diam ** 2
+#
+#     # switching to rows and cols convention
+#     points = pos[:, [1, 0]]
+#
+#     # repeating each point descriptor's size times
+#     points_rep = np.repeat(points, desc_size, axis=0)
+#
+#     # repeating each indices offsets the number of positions times
+#     len_points = len(points)
+#     indices_off = _get_indices_offsets(desc_rad)
+#     indices_off_rep = np.tile(indices_off, (len_points, 1))
+#
+#     # calculating the descriptor offsets points
+#     points_off = points_rep + indices_off_rep
+#
+#     # acquiring the normalized descriptors
+#     descs_flat = map_coordinates(im, points_off.T, order=1, prefilter=False)
+#     descs_cols = descs_flat.reshape(len_points, desc_size).T
+#     norm_descs_cols = _normalize_cols(descs_cols)
+#     return norm_descs_cols.reshape(desc_diam, desc_diam, len_points)
 
 def sample_descriptor(im, pos, desc_rad):
-    '''
-    find the descriptors for the points given.
+    """
     :param im: grayscale image to sample within
-    :param pos:  An array with shape (N,2) of [x,y] positions to
-    sample descriptors in im.
-    :param desc_rad: ”Radius” of descriptors to compute (see below).
-    :return: A 3D array with shape (K,K,N) containing the ith descriptor
-    at desc(:,:,i). The per−descriptor dimensions KxK
-    are related to the desc rad argument as follows K = 1+2∗desc rad.
-    '''
+    :param pos: An array with shape (N,2) of [x,y] positions to sample descriptors in im
+    :param desc_rad: ”Radius” of descriptors to compute
+    :return: A 3D array with shape (K,K,N) containing the ith descriptor at desc(:,:,i).
+             The per−descriptor dimensions KxK are related to the desc rad argument as follows
+             K = 1+2∗desc rad.
+    """
+    # calculating the descriptor's diameter and size
+    desc_diam = 2 * desc_rad + 1
+    desc_size = desc_diam ** 2
 
-    patchSize = 2 * desc_rad + 1
-    N = pos.shape[0]
-    patches = np.zeros((patchSize, patchSize, N))
-    xCoord = np.zeros(patchSize ** 2)
-    yCoord = np.zeros(patchSize ** 2)
-    c = 0
-    for i in range(N):
-        pljX = 0.25 * pos[i][ROWS]
-        pljY = 0.25 * pos[i][COLS]
-        for j in range(patchSize):
-            for k in range(patchSize):
-                xCoord[j * patchSize + k] = pljX - desc_rad + j
-                yCoord[j + k * patchSize] = pljY - desc_rad + j
-        patchI = map_coordinates(im, [xCoord, yCoord],
-                                 order=1, prefilter=False).reshape(patchSize,
-                                                                   patchSize)
-        meanI = np.mean(patchI)
-        patchI -= meanI
-        normI = np.linalg.norm(patchI)
-        if normI == 0:
-            patches[:, :, i] = np.zeros((patchSize, patchSize))
-            continue
+    # switching to rows and cols convention
+    points = pos[:, [1, 0]]
 
-        patchI /= np.linalg.norm(patchI)
-        patches[:, :, i] = patchI
-    return patches
+    # repeating each point descriptor's size times
+    points_rep = np.repeat(points, desc_size, axis=0)
 
+    # repeating each indices offsets the number of positions times
+    len_points = len(points)
+    indices_off = _get_indices_offsets(desc_rad)
+    indices_off_rep = np.tile(indices_off, (len_points, 1))
+
+    # calculating the descriptor offsets points
+    points_off = points_rep + indices_off_rep
+
+    # acquiring the normalized descriptors
+    descs_flat = map_coordinates(im, points_off.T, order=1, prefilter=False)
+    descs_cols = descs_flat.reshape(len_points, desc_size).T
+    norm_descs_cols = _normalize_cols(descs_cols)
+    return norm_descs_cols.reshape(desc_diam, desc_diam, len_points)
+
+def _get_indices_offsets(rad):
+    """
+    :param rad: The radius of the indices offsets
+    :return: A (2, d) array (where d = 2 *rad + 1) contains all the indices offsets with respect to
+             the given radius: [-rad, -rad], [-rad, -rad+1], ..., [rad, rad-1], [rad, rad].
+    """
+    diam = rad * 2 + 1
+    return np.indices((diam, diam)).reshape(2, -1).T - rad
+
+def _normalize_cols(matrix):
+    """
+    :param matrix: The input matrix
+    :return: The Columns normalized input matrix
+    """
+    row_means = np.mean(matrix, axis=0)
+    norm_factors = np.linalg.norm(matrix, axis=0)
+    norm_factors[norm_factors == 0] = 1
+    return (matrix - row_means) / norm_factors
 
 def find_features(pyr):
     '''
@@ -344,7 +436,7 @@ def find_features(pyr):
 
     '''
     pos = sol4_add.spread_out_corners(pyr[ORIG_IM], DEF_N, DEF_M,
-                                      DEFAULT_DESC_RAD)
+                                      DEFAULT_RADIUS)
     desc = sample_descriptor(pyr[2], pos, DEFAULT_DESC_RAD)
     # print(desc.shape)
     return pos, desc
@@ -380,8 +472,6 @@ def match_features(desc1, desc2, min_score):
     Array with shape (M,) and dtype int of matching indices in desc2
     '''
     K1 = desc1.shape[0]
-    K2 = desc2.shape[0]
-    assert K1 == K2  # todo maybe remove
     N1 = desc1.shape[2]
     N2 = desc2.shape[2]
     desc1Flatt = np.transpose(desc1.reshape(K1 ** 2, N1))
@@ -594,7 +684,6 @@ def render_panorama(ims, Hs):
         plt.figure()
         plt.imshow(panorama, cmap=plt.cm.gray)
 
-
         panorama[:, stripesBound[i]:stripesBound[i + 3]] = stitch(firstStripe,
                                                                   secStripe)
         plt.figure()
@@ -690,10 +779,9 @@ def stitch(firstStripe, secStripe):
 
     stitchArr = stitchArr + first - 1
 
-
-    #padd for blending
-    tmpR = int(np.ceil(rows/(2**PYR_LEV)) * 2**PYR_LEV)
-    tmpC = int(np.ceil(cols/(2**PYR_LEV)) * 2**PYR_LEV)
+    # padd for blending
+    tmpR = int(np.ceil(rows / (2 ** PYR_LEV)) * 2 ** PYR_LEV)
+    tmpC = int(np.ceil(cols / (2 ** PYR_LEV)) * 2 ** PYR_LEV)
     tmpS = np.zeros((tmpR, tmpC))
     tmpS[:rows, :cols] = firstStripe
     tmpS1 = tmpS
