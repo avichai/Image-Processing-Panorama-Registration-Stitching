@@ -3,11 +3,11 @@ from ex4 import sol4 as sol4
 import matplotlib.pyplot as plt
 import numpy as np
 
-INLIER_TOL = 20
+INLIER_TOL = 6
 
-DEF_NUM_ITER = 20
+DEF_NUM_ITER = 100
 
-DEF_MIN_SCORE = 0.2
+DEF_MIN_SCORE = 0.7
 
 def testHarris(im):
 
@@ -49,37 +49,32 @@ def testFindFeatures(im):
 
 
 def randomTest(im):
-    a = np.zeros((3, 3), dtype=bool)
-    a[0, :] = np.array([True, False, True])
-    a[1, :] = np.array([True, False, True])
-    a[2, :] = np.array([True, False, True])
-    row, col = np.where(a == True)
+    x = np.array([1,2,3])
+    y = np.array([4,5,6, 7, 8])
+    xv , yv = np.meshgrid(x, y)
+    print(xv)
+    print(yv)
 
-    # print(a)
-    # print(row)
-    # print(col)
-
-    a = np.zeros((3, 3))
-    a[0, :] = np.array([20, 2, 3])
-    a[1, :] = np.array([10, 5, 4])
-    a[2, :] = np.array([7, 8, 9])
-
-    out = sol4.get2MaxInd(a)
-    print(out)
-
-    match_ind1, match_ind2 = np.where(out == 1)
-    print(match_ind1, match_ind2)
-
-    # x = np.nonzero(out)
-    # print(x)
-
-    # out = sol4.get2MaxInd(np.transpose(a))
+    t = np.linspace(12, 22, 11)
+    print(t)
+    # a = np.zeros((3, 3), dtype=bool)
+    # a[0, :] = np.array([True, False, True])
+    # a[1, :] = np.array([True, False, True])
+    # a[2, :] = np.array([True, False, True])
+    # row, col = np.where(a == True)
+    #
+    #
+    # a = np.zeros((3, 3))
+    # a[0, :] = np.array([20, 2, 3])
+    # a[1, :] = np.array([10, 5, 4])
+    # a[2, :] = np.array([7, 8, 9])
+    #
+    # out = sol4.get2MaxInd(a)
     # print(out)
+    #
+    # match_ind1, match_ind2 = np.where(out == 1)
+    # print(match_ind1, match_ind2)
 
-    # x = np.argsort(a[0, :])
-    # x = np.argsort(np.transpose(a)[0,:])
-    # print(x[-1])
-    # print(x[-2])
 
 
 def testMatchFeatures(im1):
@@ -206,6 +201,72 @@ def testAccHom(im1):
     print(H2m[:, :, 2])
 
 
+def testRenderPan(im1):
+    im2 = sol4.read_image('external/office2.jpg', 1)
+    im3 = sol4.read_image('external/office3.jpg', 1)
+    im4 = sol4.read_image('external/office4.jpg', 1)
+
+    im1 = cutImages(im1)
+    im2 = cutImages(im2)
+    im3 = cutImages(im3)
+    im4 = cutImages(im4)
+
+    pyr1, filter1 = sol4.build_gaussian_pyramid(im1, 3, 3)
+    pos1, desc1 = sol4.find_features(pyr1)
+    pyr2, filter2 = sol4.build_gaussian_pyramid(im2, 3, 3)
+    pos2, desc2 = sol4.find_features(pyr2)
+
+    match_ind1, match_ind2 = sol4.match_features(desc1, desc2, DEF_MIN_SCORE)
+
+    H12, inliers1 = sol4.ransac_homography(pos1[match_ind1, :],
+                                           pos2[match_ind2, :],
+                                           DEF_NUM_ITER, INLIER_TOL)
+
+    pyr1, filter1 = sol4.build_gaussian_pyramid(im2, 3, 3)
+    pos1, desc1 = sol4.find_features(pyr1)
+    pyr2, filter2 = sol4.build_gaussian_pyramid(im3, 3, 3)
+    pos2, desc2 = sol4.find_features(pyr2)
+
+    match_ind1, match_ind2 = sol4.match_features(desc1, desc2, DEF_MIN_SCORE)
+
+    H23, inliers2 = sol4.ransac_homography(pos1[match_ind1, :],
+                                           pos2[match_ind2, :],
+                                           DEF_NUM_ITER, INLIER_TOL)
+
+    pyr1, filter1 = sol4.build_gaussian_pyramid(im3, 3, 3)
+    pos1, desc1 = sol4.find_features(pyr1)
+    pyr2, filter2 = sol4.build_gaussian_pyramid(im4, 3, 3)
+    pos2, desc2 = sol4.find_features(pyr2)
+
+    match_ind1, match_ind2 = sol4.match_features(desc1, desc2, DEF_MIN_SCORE)
+
+    H34, inliers3 = sol4.ransac_homography(pos1[match_ind1, :],
+                                           pos2[match_ind2, :],
+                                           DEF_NUM_ITER, INLIER_TOL)
+
+    H_successive = [H12, H23, H34]
+
+    m = (len(H_successive)-1)//2
+
+    H2m = sol4.accumulate_homographies(H_successive, m)
+    ims = [im1, im2, im3, im4]
+    panorama = sol4.render_panorama(ims, H2m)
+
+
+def cutImages(im):
+    '''
+    cutting images to fit dimensions of power of 2.
+    :param firstStripe:
+    :param secStripe:
+    :param mask:
+    :return:
+    '''
+    cutIm1 = im[
+             :2 ** (np.uint(np.floor(np.log2(im.shape[0])))),
+             :2 ** (np.uint(np.floor(np.log2(im.shape[1]))))]
+    return cutIm1
+
+
 
 
 # randomTest
@@ -219,13 +280,14 @@ def testAccHom(im1):
 # testAppHom
 # testRansac
 # testAccHom
+# testRenderPan
 
 
 def main():
     try:
         # im = sol4.read_image('external/backyard1.jpg', 1)
         im = sol4.read_image('external/office1.jpg', 1)
-        for test in [testAccHom]:
+        for test in [testRenderPan]:
             test(im)
     except Exception as e:
         print('Failed test due to: {0}'.format(e))

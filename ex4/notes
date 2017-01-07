@@ -1,3 +1,5 @@
 1. harris - do i get rows or cols since in the image when i use scatter it's the opposite.
 2. check if it ok meaning there could not be 2 images with different shapes
 3. check why don't i get good features
+4. check why am i failing from time to time
+5. check if only 2 the power for blending is good

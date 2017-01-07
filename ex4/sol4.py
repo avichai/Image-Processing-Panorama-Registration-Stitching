@@ -6,8 +6,7 @@ from scipy import signal as sig
 from scipy.ndimage.filters import convolve
 from scipy.ndimage import map_coordinates
 import os
-import itertools
-
+import math
 from ex4 import sol4_add
 
 IDENTITY_KERNEL_SIZE = 1
@@ -410,6 +409,9 @@ def apply_homography(pos1, H12):
     homPos1[:, 0:2] = pos1
     homPos2 = np.dot(H12, np.transpose(homPos1))
     pos2 = np.zeros(pos1.shape)
+    # if homPos2[2, :] == 0:
+    #     print('mistake')
+    # print(homPos2[2, :])
     pos2[:, 0] = np.transpose(np.divide(homPos2[0, :], homPos2[2, :]))
     pos2[:, 1] = np.transpose(np.divide(homPos2[1, :], homPos2[2, :]))
     return pos2
@@ -480,7 +482,8 @@ def display_matches(im1, im2, pos1, pos2, inliers):
     :param inliers: An array with shape (S,) of inlier matches (e.g. see
     output of ransac_homography)
     '''
-    stackedIm = np.hstack((im1, im2)) # todo check if it ok meaning there could not be 2 images with different shapes
+    stackedIm = np.hstack((im1,
+                           im2))  # todo check if it ok meaning there could not be 2 images with different shapes
     newPos2 = np.zeros(pos2.shape)
     newPos2[:, 0] = pos2[:, 0] + im1.shape[COLS]
     newPos2[:, 1] = pos2[:, 1]
@@ -490,7 +493,8 @@ def display_matches(im1, im2, pos1, pos2, inliers):
     plt.scatter(newPos2[:, 0], newPos2[:, 1], c='red', marker='.')
 
     for i in range(pos1.shape[0]):
-        plt.plot([pos1[i, 0], newPos2[i, 0]], [pos1[i, 1], newPos2[i, 1]], 'b', linewidth=0.3)
+        plt.plot([pos1[i, 0], newPos2[i, 0]], [pos1[i, 1], newPos2[i, 1]], 'b',
+                 linewidth=0.3)
 
     print(inliers.shape)
     for j in range(inliers.shape[0]):
@@ -511,19 +515,253 @@ def accumulate_homographies(H_successive, m):
     :return: A list of M 3x3 homography matrices, where H2m[i] transforms
     points from coordinate system i to coordinate system m.
     '''
-    H2m = np.zeros((3, 3, len(H_successive)))
+    H2m = np.zeros((3, 3, len(H_successive) + 1))
     currH = np.eye(3)
 
     for i in range(m):
-        tmp = np.dot(currH, H_successive[m-1-i])
-        H2m[:, :, m-1-i] = np.divide(tmp, tmp[2, 2])
-        currH = H2m[:, :, m-1-i]
+        tmp = np.dot(currH, H_successive[m - 1 - i])
+        H2m[:, :, m - 1 - i] = np.divide(tmp, tmp[2, 2])
+        currH = H2m[:, :, m - 1 - i]
 
     H2m[:, :, m] = np.eye(3)
 
     currH = np.eye(3)
-    for i in range(len(H_successive) - m - 1):
-        tmp = np.dot(np.linalg.inv(H_successive[m+i]), currH)
-        H2m[:, :, m+1+i] = np.divide(tmp, tmp[2, 2])
-        currH = H2m[:, :, m+1+i]
-    return H2m
+    for i in range(len(H_successive) - m):
+        tmp = np.dot(np.linalg.inv(H_successive[m + i]), currH)
+        H2m[:, :, m + 1 + i] = np.divide(tmp, tmp[2, 2])
+        currH = H2m[:, :, m + 1 + i]
+    return [H2m[:, :, i] for i in range(H2m.shape[2])]
+
+
+def render_panorama(ims, Hs):
+    '''
+    creates a grayscale panorama image composed of vertical strips,
+    backwarped using homographies from Hs, one from every image in ims.
+    :param ims: A list of grayscale images. (Python list)
+    :param Hs: A list of 3x3 homography matrices. Hs[i] is a homography
+    that transforms points from the coordinate system of ims [i] to the
+    coordinate system of the panorama. (Python list)
+    :return: − A grayscale panorama image composed of vertical strips,
+    backwarped using homographies from Hs, one from every image in ims.
+    '''
+
+    minX, minY, maxX, maxY = getMaxAndMin(ims, Hs)
+    rows = maxY - minY + 1
+    cols = maxX - minX + 1
+    panorama = np.zeros((rows, cols))
+    xPanoVals, yPanoVals = np.meshgrid(np.linspace(minX, maxX, cols),
+                                       np.linspace(minY, maxY, rows))
+
+    stripesBound = findBounds(ims, Hs)
+    stripesBound -= minX
+    stripesBound = np.append([0], stripesBound)
+    stripesBound = np.append(stripesBound, [cols])
+
+    firstImGridX = xPanoVals[:, :stripesBound[2]]
+    firstImGridY = yPanoVals[:, :stripesBound[2]]
+
+    posOfStrips = np.transpose(
+        np.array([firstImGridX.flatten(), firstImGridY.flatten()]))
+    im1Pos = apply_homography(posOfStrips, np.linalg.inv(Hs[0]))
+
+    firstImGridX = im1Pos[:, 0]
+    firstImGridY = im1Pos[:, 1]
+
+    panorama[:, :stripesBound[2]] = map_coordinates(ims[0], [firstImGridX,
+                                                             firstImGridY],
+                                                    order=1,
+                                                    prefilter=False).reshape(
+        panorama[:, :stripesBound[2]].shape)
+    # print(panorama[:, :stripesBound[2]])
+
+    for i in range(len(stripesBound) - 3):
+        gridX = xPanoVals[:, stripesBound[i]:stripesBound[3 + i]]
+        gridY = yPanoVals[:, stripesBound[i]:stripesBound[3 + i]]
+
+        posOfStrips = np.transpose(
+            np.array([gridX.flatten(), gridY.flatten()]))
+        imPos = apply_homography(posOfStrips, np.linalg.inv(Hs[1 + i]))
+
+        gridX = imPos[:, 0]
+        gridY = imPos[:, 1]
+
+        firstStripe = panorama[:, stripesBound[i]:stripesBound[i + 3]]
+
+        secStripe = map_coordinates(ims[1 + i], [gridX, gridY], order=1,
+                                    prefilter=False).reshape(
+            panorama[:, stripesBound[i]:stripesBound[i + 3]].shape)
+
+        plt.figure()
+        plt.imshow(panorama, cmap=plt.cm.gray)
+
+
+        panorama[:, stripesBound[i]:stripesBound[i + 3]] = stitch(firstStripe,
+                                                                  secStripe)
+        plt.figure()
+        plt.imshow(panorama, cmap=plt.cm.gray)
+        plt.show()
+        print(panorama[:, stripesBound[i]:stripesBound[i + 3]])
+
+    lastImGridX = xPanoVals[:, stripesBound[len(stripesBound) - 3]:stripesBound[
+        len(stripesBound) - 1]]
+    lastImGridY = yPanoVals[::,
+                  stripesBound[len(stripesBound) - 3]:stripesBound[
+                      len(stripesBound) - 1]]
+
+    posOfStrips = np.transpose(
+        np.array([lastImGridX.flatten(), lastImGridY.flatten()]))
+    imLastPos = apply_homography(posOfStrips,
+                                 np.linalg.inv(Hs[len(Hs) - 1]))
+
+    lastImGridX = imLastPos[:, 0]
+    lastImGridY = imLastPos[:, 1]
+
+    lastStripe = map_coordinates(ims[len(ims) - 1], [lastImGridX, lastImGridY],
+                                 order=1,
+                                 prefilter=False).reshape(panorama[:,
+                                                          stripesBound[len(
+                                                              stripesBound) - 3]:
+                                                          stripesBound[
+                                                              len(
+                                                                  stripesBound) - 1]].shape)
+    oldStripe = panorama[:, stripesBound[len(stripesBound) - 3]:stripesBound[
+        len(stripesBound) - 1]]
+
+    panorama[:, stripesBound[len(stripesBound) - 3]:stripesBound[
+        len(stripesBound) - 1]] = stitch(oldStripe, lastStripe)
+
+    return panorama
+
+
+def stitch(firstStripe, secStripe):
+    '''
+    stitch 2 strips
+    :param firstStripe:
+    :param secStripe:
+    :return:
+    '''
+    PYR_LEV = 6
+    firstStripe = np.nan_to_num(firstStripe)
+    secStripe = np.nan_to_num(secStripe)
+    rows, cols = firstStripe.shape
+
+    overlap = np.multiply(firstStripe, secStripe)
+    cumsum = np.cumsum(overlap, axis=1)
+    nonZero = np.nonzero(cumsum)
+    first = nonZero[1][0]
+    last = nonZero[1][len(nonZero[1]) - 1]
+    first += 5  # todo change if nedded
+    last -= 5
+
+    colsOverlap = last - first + 1
+
+    # dynamic programing
+    diff = np.ones((rows, colsOverlap))
+
+    for i in range(colsOverlap):
+        diff[0, i] = (firstStripe[0, first + i] - secStripe[0, first + i]) ** 2
+
+    for j in range(rows - 1):
+        # for borders todo
+        diff[j + 1, 0] = (firstStripe[j + 1, first] - secStripe[j + 1,
+                                                                first]) ** 2 + np.min(
+            diff[j, :2])
+        diff[j + 1, colsOverlap - 1] = (firstStripe[j + 1, last] - secStripe[
+            j + 1,
+            last]) ** 2 + np.min(diff[j, colsOverlap - 2:])
+
+        for i in range(colsOverlap - 2):
+            diff[j + 1, i + 1] = (firstStripe[j + 1, first + i + 1] - secStripe[
+                j + 1,
+                first + i + 1]) ** 2 + np.min(diff[j, i:i + 3])
+    stitchArr = np.zeros((1, rows))
+    ind = np.argmin(diff[rows - 1, 1:colsOverlap - 1])
+    stitchArr[0, rows - 1] = ind + 1
+
+    for i in range(rows - 1):
+        l = int((stitchArr[0, rows - 1 - i] - 1))
+        r = int((stitchArr[0, rows - 1 - i] + 1))
+        ind = np.argmin(diff[rows - 1 - i, l:r + 1])
+        if ind == 0:
+            ind = 1
+        if ind == colsOverlap - 1:
+            ind = colsOverlap - 2
+        stitchArr[0, rows - 1 - i - 1] = ind + l - 1
+
+    stitchArr = stitchArr + first - 1
+
+
+    #padd for blending
+    tmpR = int(np.ceil(rows/(2**PYR_LEV)) * 2**PYR_LEV)
+    tmpC = int(np.ceil(cols/(2**PYR_LEV)) * 2**PYR_LEV)
+    tmpS = np.zeros((tmpR, tmpC))
+    tmpS[:rows, :cols] = firstStripe
+    tmpS1 = tmpS
+    tmpS[:rows, :cols] = secStripe
+    tmpS2 = tmpS
+
+    mask = np.zeros(tmpS1.shape)
+    for i in range(rows):
+        mask[i, :int((stitchArr[0, i]))] = 1
+
+    res = pyramid_blending(tmpS1, tmpS2, mask, PYR_LEV, 5, 5)
+    print(res)
+    return res[:rows, :cols]
+
+
+def findBounds(ims, Hs):
+    '''
+    find the strips x bounds
+    :param Hs: A list of 3x3 homography matrices. Hs[i] is a homography
+    that transforms points from the coordinate system of ims [i] to the
+    coordinate system of the panorama. (Python list)
+    :param ims: A list of grayscale images. (Python list)
+    :return: the strips x bounds
+    '''
+
+    bounds = np.zeros(len(ims) - 1).astype(np.int64)
+
+    for i in range(len(ims) - 1):
+        xIcenter = np.ceil(ims[i].shape[COLS] / 2)
+        yIcenter = np.ceil(ims[i].shape[ROWS] / 2)
+        xIp1center = np.ceil(ims[i + 1].shape[COLS] / 2)
+        yIp1center = np.ceil(ims[i].shape[ROWS] / 2)
+
+        ihomCenter = apply_homography(
+            np.array([xIcenter, yIcenter]).reshape(1, 2), Hs[i])
+        ip1homCenter = apply_homography(
+            np.array([xIp1center, yIp1center]).reshape(1, 2), Hs[i + 1])
+
+        bounds[i] = np.ceil((ihomCenter[0][ROWS] + ip1homCenter[0][ROWS]) / 2)
+
+    return bounds
+
+
+def getMaxAndMin(ims, Hs):
+    '''
+    find min and max x and y for panorama
+    :param ims: A list of grayscale images. (Python list)
+    :param Hs:  A list of 3x3 homography matrices. Hs[i] is a homography
+    that transforms points from the coordinate system of ims [i] to the
+    coordinate system of the panorama. (Python list)
+    :return: min and max x and y for panorama
+    '''
+
+    numIm = len(ims)
+    xAndy = np.zeros((4 * numIm, 2))
+    for i in range(numIm):
+        numRows, numCols = ims[i].shape
+        edges = [[0, 0], [numCols - 1, 0], [0, numRows - 1],
+                 [numCols - 1, numRows - 1]]
+        edges = np.array(edges)
+        homEdges = apply_homography(edges, Hs[i])
+        # print(homEdges)
+        xAndy[4 * i] = homEdges[0]
+        xAndy[4 * i + 1] = homEdges[1]
+        xAndy[4 * i + 2] = homEdges[2]
+        xAndy[4 * i + 3] = homEdges[3]
+
+    return [np.floor(np.min(xAndy[:, 0])).astype(np.int64),
+            np.floor(np.min(xAndy[:, 1])).astype(np.int64),
+            np.ceil(np.max(xAndy[:, 0])).astype(np.int64),
+            np.ceil(np.max(xAndy[:, 1])).astype(np.int64)]
