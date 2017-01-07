@@ -6,15 +6,9 @@ from scipy import signal as sig
 from scipy.ndimage.filters import convolve
 from scipy.ndimage import map_coordinates
 import os
+import itertools
+
 from ex4 import sol4_add
-
-DEF_M = 7
-
-DEF_N = 7
-
-DEFAULT_DESC_RAD = 3
-
-ORIG_IM = 0
 
 IDENTITY_KERNEL_SIZE = 1
 BINOMIAL_MAT = [0.5, 0.5]
@@ -30,6 +24,10 @@ DEFAULT_KER_SIZE = 3
 DEFAULT_K = 0.4
 FIRST_EIG_VAL_IND = 0
 SEC_EIG_VAL_IND = 0
+ORIG_IM = 0
+DEFAULT_DESC_RAD = 5
+DEF_N = 7
+DEF_M = 11
 
 
 def read_image(filename, representation):
@@ -286,20 +284,11 @@ def harris_corner_detector(im):
         np.multiply(bluredDerXderY, bluredDerXderY)
 
     locMax = sol4_add.non_maximum_suppression(R)
-    row, col = np.where(locMax == True)
+    y, x = np.where(locMax == True)
 
-    pos = np.zeros((row.shape[0], 2))
-    pos[:, 0] = row
-    pos[:, 1] = col
-
-    # plt.figure()
-    # plt.imshow(im, cmap=plt.cm.gray)
-    # plt.scatter(col, row, marker='.')
-    # plt.figure()
-    # plt.imshow(R, cmap=plt.cm.gray)
-    # plt.figure()
-    # plt.imshow(locMax, cmap=plt.cm.gray)
-    # plt.show()
+    pos = np.zeros((x.shape[0], 2))
+    pos[:, 0] = x
+    pos[:, 1] = y
 
     return pos
 
@@ -316,26 +305,32 @@ def sample_descriptor(im, pos, desc_rad):
     are related to the desc rad argument as follows K = 1+2∗desc rad.
     '''
 
-    patchSize = 2*desc_rad + 1
+    patchSize = 2 * desc_rad + 1
     N = pos.shape[0]
     patches = np.zeros((patchSize, patchSize, N))
-    print(im.shape)
-    xCoord = np.zeros(patchSize**2)
-    yCoord = np.zeros( patchSize**2)
+    xCoord = np.zeros(patchSize ** 2)
+    yCoord = np.zeros(patchSize ** 2)
+    c = 0
     for i in range(N):
-        pljX = 0.25*pos[i][ROWS]
-        pljY = 0.25*pos[i][COLS]
+        pljX = 0.25 * pos[i][ROWS]
+        pljY = 0.25 * pos[i][COLS]
         for j in range(patchSize):
             for k in range(patchSize):
-                xCoord[j*patchSize + k] = pljX - desc_rad + j
-                yCoord[j + k*patchSize] = pljY - desc_rad + j
-        patches[:, :, i] = map_coordinates(im, [xCoord, yCoord],
-                                         order=1).reshape(patchSize, patchSize)
+                xCoord[j * patchSize + k] = pljX - desc_rad + j
+                yCoord[j + k * patchSize] = pljY - desc_rad + j
+        patchI = map_coordinates(im, [xCoord, yCoord],
+                                 order=1, prefilter=False).reshape(patchSize,
+                                                                   patchSize)
+        meanI = np.mean(patchI)
+        patchI -= meanI
+        normI = np.linalg.norm(patchI)
+        if normI == 0:
+            patches[:, :, i] = np.zeros((patchSize, patchSize))
+            continue
 
+        patchI /= np.linalg.norm(patchI)
+        patches[:, :, i] = patchI
     return patches
-
-
-
 
 
 def find_features(pyr):
@@ -349,7 +344,186 @@ def find_features(pyr):
     desc − A feature descriptor array with shape (K,K,N).
 
     '''
-    pos = sol4_add.spread_out_corners(pyr[ORIG_IM], DEF_N, DEF_M) # todo what is radius???
-    pos = harris_corner_detector(pyr[ORIG_IM])
+    pos = sol4_add.spread_out_corners(pyr[ORIG_IM], DEF_N, DEF_M,
+                                      DEFAULT_DESC_RAD)
     desc = sample_descriptor(pyr[2], pos, DEFAULT_DESC_RAD)
+    # print(desc.shape)
     return pos, desc
+
+
+def get2MaxInd(mat):
+    '''
+    returns a matrix of the same size as input with 2 max indices
+    are 1 and other 0
+    :param mat: input matrix
+    :return: a matrix of the same size as input with 2 max indices
+    are 1 and other 0
+    '''
+    out = np.zeros(mat.shape)
+    for i in range(mat.shape[0]):
+        m = np.argsort(mat[i, :])
+        i1, i2 = m[-1], m[-2]
+        out[i, i1] = 1
+        out[i, i2] = 1
+
+    return out
+
+
+def match_features(desc1, desc2, min_score):
+    '''
+    match features in 2 images.
+    :param desc1: A feature descriptor array with shape (K,K,N1)
+    :param desc2: A feature descriptor array with shape (K,K,N2)
+    :param min_score: Minimal match score between two descriptors
+    required to be regarded as corresponding points.
+    :return:
+    Array with shape (M,) and dtype int of matching indices in desc1
+    Array with shape (M,) and dtype int of matching indices in desc2
+    '''
+    K1 = desc1.shape[0]
+    K2 = desc2.shape[0]
+    assert K1 == K2  # todo maybe remove
+    N1 = desc1.shape[2]
+    N2 = desc2.shape[2]
+    desc1Flatt = np.transpose(desc1.reshape(K1 ** 2, N1))
+    desc2Flatt = desc2.reshape(K1 ** 2, N2)
+    responseDescs = np.dot(desc1Flatt, desc2Flatt)
+    responseDescs[responseDescs < min_score] = 0
+    M1 = get2MaxInd(responseDescs)
+    M2 = np.transpose(get2MaxInd(np.transpose(responseDescs)))
+    matches = np.multiply(M1, M2)
+    match_ind1, match_ind2 = np.where(matches == 1)
+
+    return match_ind1, match_ind2
+
+
+def apply_homography(pos1, H12):
+    '''
+    applies a homography transformation on a set of points
+    :param pos1: − An array with shape (N,2) of [x,y] point coordinates
+    :param H12: A 3x3 homography matrix
+    :return: An array with the same shape as pos1 with [x,y] point
+    coordinates in image i+1 obtained from transforming pos1 using H12.
+
+    '''
+    homPos1 = np.ones((pos1.shape[0], 3))
+    homPos1[:, 0:2] = pos1
+    homPos2 = np.dot(H12, np.transpose(homPos1))
+    pos2 = np.zeros(pos1.shape)
+    pos2[:, 0] = np.transpose(np.divide(homPos2[0, :], homPos2[2, :]))
+    pos2[:, 1] = np.transpose(np.divide(homPos2[1, :], homPos2[2, :]))
+    return pos2
+
+
+def ransac_homography(pos1, pos2, num_iters, inlier_tol):
+    '''
+    perform Ransac
+    :param pos1, pos2: Two Arrays, each with shape (N,2) containing n rows
+    of [x,y]  coordinates of matched points.
+    :param num_iters: Number of RANSAC iterations to perform
+    :param inlier_tol: inlier tolerance threshold
+    :return:
+    H12 − A 3x3 normalized homography matrix
+    inliers − An Array with shape (S,) where S is the number of inliers,
+    containing the indices in pos1/pos2 of the maximal set of inlier
+    matches found.
+    '''
+    N1 = pos1.shape[0]
+    N2 = pos2.shape[0]
+    assert N1 == N2 and num_iters >= 1 and inlier_tol > 0
+
+    countInliers = 0
+    inliersInds = np.zeros(N1)
+
+    for i in range(num_iters):
+        curInliersInds = np.zeros(N1)
+        curCountInliers = 0
+        randInds = np.random.permutation(N1)[:4]
+        H12 = sol4_add.least_squares_homography(pos1[randInds, :],
+                                                pos2[randInds, :])
+        if H12 is not None:
+            homPos2 = apply_homography(pos1, H12)
+            for j in range(N1):
+                if np.linalg.norm(homPos2[j, :] - pos2[j, :]) ** 2 < inlier_tol:
+                    curInliersInds[curCountInliers] = j
+                    curCountInliers += 1
+            if curCountInliers > countInliers:
+                countInliers = curCountInliers
+                inliersInds = curInliersInds
+
+    inliersInds = inliersInds[inliersInds != 0].astype(np.uint8)
+    H12 = sol4_add.least_squares_homography(pos1[inliersInds, :],
+                                            pos2[inliersInds, :])
+
+    # another calculation of E
+    curInliersInds = np.zeros(N1)
+    curCountInliers = 0
+    homPos2 = apply_homography(pos1, H12)
+    for j in range(N1):
+        if np.linalg.norm(homPos2[j, :] - pos2[j, :]) ** 2 < inlier_tol:
+            curInliersInds[curCountInliers] = j
+            curCountInliers += 1
+
+    inliersInds = curInliersInds[curInliersInds != 0].astype(np.uint8)
+    return H12, inliersInds
+
+
+def display_matches(im1, im2, pos1, pos2, inliers):
+    '''
+    visualize the full set of point matches and the inlier matches
+    detected by RANSAC
+    :param im1: grayscale images
+    :param im2: grayscale images
+    :param pos1, pos2: Two arrays with shape (N,2) each, containing N rows
+    of [x,y] coordinates of matched points in im1 and im2 (i.e. the match
+    of the ith coordinate is pos1[i,:] in im1 and pos2[i,:] in im2).
+    :param inliers: An array with shape (S,) of inlier matches (e.g. see
+    output of ransac_homography)
+    '''
+    stackedIm = np.hstack((im1, im2)) # todo check if it ok meaning there could not be 2 images with different shapes
+    newPos2 = np.zeros(pos2.shape)
+    newPos2[:, 0] = pos2[:, 0] + im1.shape[COLS]
+    newPos2[:, 1] = pos2[:, 1]
+    plt.figure()
+    plt.imshow(stackedIm, cmap=plt.cm.gray)
+    plt.scatter(pos1[:, 0], pos1[:, 1], c='red', marker='.')
+    plt.scatter(newPos2[:, 0], newPos2[:, 1], c='red', marker='.')
+
+    for i in range(pos1.shape[0]):
+        plt.plot([pos1[i, 0], newPos2[i, 0]], [pos1[i, 1], newPos2[i, 1]], 'b', linewidth=0.3)
+
+    print(inliers.shape)
+    for j in range(inliers.shape[0]):
+        plt.plot([pos1[inliers[j], 0], newPos2[inliers[j], 0]],
+                 [pos1[inliers[j], 1], newPos2[inliers[j], 1]], 'y',
+                 linewidth=1)
+    plt.show()
+
+
+def accumulate_homographies(H_successive, m):
+    '''
+    return new homographies from some fram to frame m
+    :param H_successive: A list of M−1 3x3 homography matrices where H
+    successive[i] is a homography that transforms points
+    from coordinate system i to coordinate system i+1
+    :param m: − Index of the coordinate system we would like to accumulate
+    the given homographies towards.
+    :return: A list of M 3x3 homography matrices, where H2m[i] transforms
+    points from coordinate system i to coordinate system m.
+    '''
+    H2m = np.zeros((3, 3, len(H_successive)))
+    currH = np.eye(3)
+
+    for i in range(m):
+        tmp = np.dot(currH, H_successive[m-1-i])
+        H2m[:, :, m-1-i] = np.divide(tmp, tmp[2, 2])
+        currH = H2m[:, :, m-1-i]
+
+    H2m[:, :, m] = np.eye(3)
+
+    currH = np.eye(3)
+    for i in range(len(H_successive) - m - 1):
+        tmp = np.dot(np.linalg.inv(H_successive[m+i]), currH)
+        H2m[:, :, m+1+i] = np.divide(tmp, tmp[2, 2])
+        currH = H2m[:, :, m+1+i]
+    return H2m
