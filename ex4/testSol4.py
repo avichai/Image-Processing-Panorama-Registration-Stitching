@@ -1,11 +1,12 @@
 from ex4 import sol4 as sol4
+from ex4 import sol4_utils
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 INLIER_TOL = 6
 
-DEF_NUM_ITER = 10000
+DEF_NUM_ITER = 1000
 
 DEF_MIN_SCORE = 0.0
 
@@ -81,13 +82,13 @@ def testMatchFeatures(im1):
 
     # todo this is the same picture try different ones
     # im2 = sol4.read_image('external/backyard1.jpg', 1)
-    im2 = sol4.read_image('external/office2.jpg', 1)
+    im2 = sol4_utils.read_image('external/office2.jpg', 1)
 
 
-    pyr1, filter1 = sol4.build_gaussian_pyramid(im1, 3, 3)
+    pyr1, filter1 = sol4_utils.build_gaussian_pyramid(im1, 3, 3)
     pos1, desc1 = sol4.find_features(pyr1)
-    pyr2, filter2 = sol4.build_gaussian_pyramid(im2, 3, 3)
-    pos2, desc2 = sol4.find_features(pyr2)
+    pyr2, filter2 = sol4_utils.build_gaussian_pyramid(im2, 3, 3)
+    pos2, desc2 = sol4_utils.find_features(pyr2)
     match_ind1, match_ind2 = sol4.match_features(desc1, desc2, DEF_MIN_SCORE)
 
     # print(match_ind2[match_ind1 != match_ind2])
@@ -112,7 +113,7 @@ def testMatchFeatures(im1):
 
 
 def testAppHom(im):
-    pyr1, filter1 = sol4.build_gaussian_pyramid(im, 3, 3)
+    pyr1, filter1 = sol4_utils.build_gaussian_pyramid(im, 3, 3)
     pos1, desc1 = sol4.find_features(pyr1)
 
     H12 = np.diag([1, 2, 3])
@@ -123,11 +124,11 @@ def testAppHom(im):
 def testRansac(im1):
 
 
-    im2 = sol4.read_image('external/office2.jpg', 1)
+    im2 = sol4_utils.read_image('external/office2.jpg', 1)
 
-    pyr1, filter1 = sol4.build_gaussian_pyramid(im1, 3, 3)
+    pyr1, filter1 = sol4_utils.build_gaussian_pyramid(im1, 3, 3)
     pos1, desc1 = sol4.find_features(pyr1)
-    pyr2, filter2 = sol4.build_gaussian_pyramid(im2, 3, 3)
+    pyr2, filter2 = sol4_utils.build_gaussian_pyramid(im2, 3, 3)
     pos2, desc2 = sol4.find_features(pyr2)
 
     match_ind1, match_ind2 = sol4.match_features(desc1, desc2, DEF_MIN_SCORE)
@@ -140,11 +141,11 @@ def testRansac(im1):
 def display_matches(im1):
     # im2 = sol4.read_image('external/backyard1.jpg', 1)
 
-    im2 = sol4.read_image('external/office2.jpg', 1)
+    im2 = sol4_utils.read_image('external/office2.jpg', 1)
 
-    pyr1, filter1 = sol4.build_gaussian_pyramid(im1, 3, 3)
+    pyr1, filter1 = sol4_utils.build_gaussian_pyramid(im1, 3, 3)
     pos1, desc1 = sol4.find_features(pyr1)
-    pyr2, filter2 = sol4.build_gaussian_pyramid(im2, 3, 3)
+    pyr2, filter2 = sol4_utils.build_gaussian_pyramid(im2, 3, 3)
     pos2, desc2 = sol4.find_features(pyr2)
 
     match_ind1, match_ind2 = sol4.match_features(desc1, desc2, DEF_MIN_SCORE)
@@ -157,13 +158,13 @@ def display_matches(im1):
 
 
 def testAccHom(im1):
-    im2 = sol4.read_image('external/office2.jpg', 1)
-    im3 = sol4.read_image('external/office3.jpg', 1)
-    im4 = sol4.read_image('external/office4.jpg', 1)
+    im2 = sol4_utils.read_image('external/office2.jpg', 1)
+    im3 = sol4_utils.read_image('external/office3.jpg', 1)
+    im4 = sol4_utils.read_image('external/office4.jpg', 1)
 
-    pyr1, filter1 = sol4.build_gaussian_pyramid(im1, 3, 3)
+    pyr1, filter1 = sol4_utils.build_gaussian_pyramid(im1, 3, 3)
     pos1, desc1 = sol4.find_features(pyr1)
-    pyr2, filter2 = sol4.build_gaussian_pyramid(im2, 3, 3)
+    pyr2, filter2 = sol4_utils.build_gaussian_pyramid(im2, 3, 3)
     pos2, desc2 = sol4.find_features(pyr2)
 
     match_ind1, match_ind2 = sol4.match_features(desc1, desc2, DEF_MIN_SCORE)
@@ -172,9 +173,9 @@ def testAccHom(im1):
                                           pos2[match_ind2, :],
                                           DEF_NUM_ITER, INLIER_TOL)
 
-    pyr1, filter1 = sol4.build_gaussian_pyramid(im2, 3, 3)
+    pyr1, filter1 = sol4_utils.build_gaussian_pyramid(im2, 3, 3)
     pos1, desc1 = sol4.find_features(pyr1)
-    pyr2, filter2 = sol4.build_gaussian_pyramid(im3, 3, 3)
+    pyr2, filter2 = sol4_utils.build_gaussian_pyramid(im3, 3, 3)
     pos2, desc2 = sol4.find_features(pyr2)
 
     match_ind1, match_ind2 = sol4.match_features(desc1, desc2, DEF_MIN_SCORE)
@@ -183,9 +184,9 @@ def testAccHom(im1):
                                           pos2[match_ind2, :],
                                           DEF_NUM_ITER, INLIER_TOL)
 
-    pyr1, filter1 = sol4.build_gaussian_pyramid(im3, 3, 3)
+    pyr1, filter1 = sol4_utils.build_gaussian_pyramid(im3, 3, 3)
     pos1, desc1 = sol4.find_features(pyr1)
-    pyr2, filter2 = sol4.build_gaussian_pyramid(im4, 3, 3)
+    pyr2, filter2 = sol4_utils.build_gaussian_pyramid(im4, 3, 3)
     pos2, desc2 = sol4.find_features(pyr2)
 
     match_ind1, match_ind2 = sol4.match_features(desc1, desc2, DEF_MIN_SCORE)
@@ -199,23 +200,24 @@ def testAccHom(im1):
     m = (len(H_successive)-1)//2
 
     H2m = sol4.accumulate_homographies(H_successive, m)
-
-    print(H2m[:, :, 2])
+    # tmp = sol4.accumulate_homographies1(H_successive, m)
+    print(H2m[2])
+    # print(tmp[2])
 
 
 def testRenderPan(im1):
-    im2 = sol4.read_image('external/office2.jpg', 1)
-    im3 = sol4.read_image('external/office3.jpg', 1)
-    im4 = sol4.read_image('external/office4.jpg', 1)
+    im2 = sol4_utils.read_image('external/office2.jpg', 1)
+    im3 = sol4_utils.read_image('external/office3.jpg', 1)
+    im4 = sol4_utils.read_image('external/office4.jpg', 1)
 
     im1 = cutImages(im1)
     im2 = cutImages(im2)
     im3 = cutImages(im3)
     im4 = cutImages(im4)
 
-    pyr1, filter1 = sol4.build_gaussian_pyramid(im1, 3, 3)
+    pyr1, filter1 = sol4_utils.build_gaussian_pyramid(im1, 3, 3)
     pos1, desc1 = sol4.find_features(pyr1)
-    pyr2, filter2 = sol4.build_gaussian_pyramid(im2, 3, 3)
+    pyr2, filter2 = sol4_utils.build_gaussian_pyramid(im2, 3, 3)
     pos2, desc2 = sol4.find_features(pyr2)
 
     match_ind1, match_ind2 = sol4.match_features(desc1, desc2, DEF_MIN_SCORE)
@@ -224,9 +226,9 @@ def testRenderPan(im1):
                                            pos2[match_ind2, :],
                                            DEF_NUM_ITER, INLIER_TOL)
 
-    pyr1, filter1 = sol4.build_gaussian_pyramid(im2, 3, 3)
+    pyr1, filter1 = sol4_utils.build_gaussian_pyramid(im2, 3, 3)
     pos1, desc1 = sol4.find_features(pyr1)
-    pyr2, filter2 = sol4.build_gaussian_pyramid(im3, 3, 3)
+    pyr2, filter2 = sol4_utils.build_gaussian_pyramid(im3, 3, 3)
     pos2, desc2 = sol4.find_features(pyr2)
 
     match_ind1, match_ind2 = sol4.match_features(desc1, desc2, DEF_MIN_SCORE)
@@ -235,9 +237,9 @@ def testRenderPan(im1):
                                            pos2[match_ind2, :],
                                            DEF_NUM_ITER, INLIER_TOL)
 
-    pyr1, filter1 = sol4.build_gaussian_pyramid(im3, 3, 3)
+    pyr1, filter1 = sol4_utils.build_gaussian_pyramid(im3, 3, 3)
     pos1, desc1 = sol4.find_features(pyr1)
-    pyr2, filter2 = sol4.build_gaussian_pyramid(im4, 3, 3)
+    pyr2, filter2 = sol4_utils.build_gaussian_pyramid(im4, 3, 3)
     pos2, desc2 = sol4.find_features(pyr2)
 
     match_ind1, match_ind2 = sol4.match_features(desc1, desc2, DEF_MIN_SCORE)
@@ -288,9 +290,9 @@ def cutImages(im):
 
 def main():
     try:
-        # im = sol4.read_image('external/backyard1.jpg', 1)
-        im = sol4.read_image('external/office1.jpg', 1)
-        for test in [display_matches]:
+        # im = sol4_utils.read_image('external/backyard1.jpg', 1)
+        im = sol4_utils.read_image('external/office1.jpg', 1)
+        for test in [testAccHom]:
             test(im)
     except Exception as e:
         print('Failed test due to: {0}'.format(e))
