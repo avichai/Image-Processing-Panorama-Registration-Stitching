@@ -93,7 +93,10 @@ def _normalize_cols(matrix):
     :return: The Columns normalized input matrix
     """
     row_means = np.mean(matrix, axis=0)
+    print(row_means.shape)
+    print(row_means[1])
     norm_factors = np.linalg.norm(matrix, axis=0)
+    print(norm_factors[1])
     norm_factors[norm_factors == 0] = 1
     return (matrix - row_means) / norm_factors
 
@@ -826,7 +829,9 @@ def sample_descriptor(im, pos, desc_rad):
     are related to the desc rad argument as follows K = 1+2∗desc rad.
     '''
 
-    posFix = pos[:, [0, 1]]
+    posFix = pos[:, [1, 0]]
+    # print(pos[21])
+    print(posFix[0])
     patchWidth = 2 * desc_rad + 1
     patchSize = patchWidth ** 2
     N = posFix.shape[0]
@@ -835,73 +840,87 @@ def sample_descriptor(im, pos, desc_rad):
     yCoord = np.zeros(patchSize)
     c = 0
     for i in range(N):
-        pointI = np.repeat(posFix[i], patchSize, axis=0).reshape((patchSize, 2))
+        pointI = np.repeat(np.transpose(posFix[i]), patchSize, axis=0)
+        if i == 0:
+            print(pointI)
+        # if i == 21 :
+            # print([posFix[21]])
+            # print(pointI)
         offset = np.indices((patchWidth, patchWidth))
         pointI = pointI + (np.transpose(offset.reshape(2, -1)) - desc_rad)
 
         tmp = map_coordinates(im, np.transpose(pointI),
-                                 order=1, prefilter=False).reshape(patchWidth,
-                                                                   patchWidth)
-        print(tmp1.shape)
-
-
-        pljX = pos[i][ROWS]
-        pljY = pos[i][COLS]
-        for j in range(patchWidth):
-            for k in range(patchWidth):
-                xCoord[j * patchWidth + k] = pljX - desc_rad + j
-                yCoord[j + k * patchWidth] = pljY - desc_rad + j
-
-        # print(yCoord.shape)
-        patchI = map_coordinates(im, [xCoord, yCoord],
+                              order=1, prefilter=False)
+        patchI = map_coordinates(im, np.transpose(pointI),
                                  order=1, prefilter=False).reshape(patchWidth,
                                                                    patchWidth)
 
+
+        # pljX = pos[i][ROWS]
+        # pljY = pos[i][COLS]
+        # for j in range(patchWidth):
+        #     for k in range(patchWidth):
+        #         xCoord[j * patchWidth + k] = pljX - desc_rad + j
+        #         yCoord[j + k * patchWidth] = pljY - desc_rad + j
+        #
+        # # print(yCoord.shape)
+        # patchI = map_coordinates(im, [xCoord, yCoord],
+        #                          order=1, prefilter=False).reshape(patchWidth,
+        #                                                            patchWidth)
+        #
         meanI = np.mean(patchI)
-        patchI -= meanI
         normI = np.linalg.norm(patchI)
-        if normI == 0:
-            patches[:, :, i] = np.zeros((patchWidth, patchWidth))
+        if i == 0 :
+            print(meanI)
+            print(normI)
+            print(tmp)
+        patchI -= meanI
+
+        if normI == 20:
             continue
 
-        patchI /= np.linalg.norm(patchI)
+        patchI /= normI
         patches[:, :, i] = patchI
     return patches
 
-#
-# def sample_descriptor(im, pos, desc_rad):
-#     """
-#     :param im: grayscale image to sample within
-#     :param pos: An array with shape (N,2) of [x,y] positions to sample descriptors in im
-#     :param desc_rad: ”Radius” of descriptors to compute
-#     :return: A 3D array with shape (K,K,N) containing the ith descriptor at desc(:,:,i).
-#              The per−descriptor dimensions KxK are related to the desc rad argument as follows
-#              K = 1+2∗desc rad.
-#     """
-#     # calculating the descriptor's diameter and size
-#     desc_diam = 2 * desc_rad + 1
-#     desc_size = desc_diam ** 2
-#
-#     # switching to rows and cols convention
-#     points = pos[:, [1, 0]]
-#
-#     # repeating each point descriptor's size times
-#     points_rep = np.repeat(points, desc_size, axis=0)
-#     print(points)
-#
-#     # repeating each indices offsets the number of positions times
-#     len_points = len(points)
-#     indices_off = _get_indices_offsets(desc_rad)
-#     indices_off_rep = np.tile(indices_off, (len_points, 1))
-#
-#     # calculating the descriptor offsets points
-#     points_off = points_rep + indices_off_rep
-#
-#     # acquiring the normalized descriptors
-#     descs_flat = map_coordinates(im, points_off.T, order=1, prefilter=False)
-#     descs_cols = descs_flat.reshape(len_points, desc_size).T
-#     norm_descs_cols = _normalize_cols(descs_cols)
-#     return norm_descs_cols.reshape(desc_diam, desc_diam, len_points)
+
+def sample_descriptor1(im, pos, desc_rad):
+    """
+    :param im: grayscale image to sample within
+    :param pos: An array with shape (N,2) of [x,y] positions to sample descriptors in im
+    :param desc_rad: ”Radius” of descriptors to compute
+    :return: A 3D array with shape (K,K,N) containing the ith descriptor at desc(:,:,i).
+             The per−descriptor dimensions KxK are related to the desc rad argument as follows
+             K = 1+2∗desc rad.
+    """
+    # calculating the descriptor's diameter and size
+    desc_diam = 2 * desc_rad + 1
+    desc_size = desc_diam ** 2
+
+    # switching to rows and cols convention
+    points = pos[:, [1, 0]]
+
+    print(points[0])
+    # repeating each point descriptor's size times
+    points_rep = np.repeat(points, desc_size, axis=0)
+    print(points_rep[0:49])
+    # print(points)
+
+    # repeating each indices offsets the number of positions times
+    len_points = len(points)
+    indices_off = _get_indices_offsets(desc_rad)
+    indices_off_rep = np.tile(indices_off, (len_points, 1))
+
+    # calculating the descriptor offsets points
+    points_off = points_rep + indices_off_rep
+
+    # acquiring the normalized descriptors
+    descs_flat = map_coordinates(im, points_off.T, order=1, prefilter=False)
+    descs_cols = descs_flat.reshape(len_points, desc_size).T
+    print(descs_cols.shape)
+    print(descs_cols[:, 0])
+    norm_descs_cols = _normalize_cols(descs_cols)
+    return norm_descs_cols.reshape(desc_diam, desc_diam, len_points)
 
 # def sample_descriptor(im, pos, desc_rad):
 #     """
