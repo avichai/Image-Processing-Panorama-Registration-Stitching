@@ -5,7 +5,7 @@ import numpy as np
 
 INLIER_TOL = 6
 
-DEF_NUM_ITER = 100
+DEF_NUM_ITER = 10000
 
 DEF_MIN_SCORE = 0.0
 
@@ -92,23 +92,23 @@ def testMatchFeatures(im1):
 
     # print(match_ind2[match_ind1 != match_ind2])
 
-    # plt.figure()
-    # plt.imshow(im1, cmap=plt.cm.gray)
-    # plt.figure()
-    # plt.imshow(im2, cmap=plt.cm.gray)
-    # plt.figure()
-    # plt.imshow(im1, cmap=plt.cm.gray)
-    # plt.scatter(pos1[:, 0], pos1[:, 1], marker='.')
-    # plt.figure()
-    # plt.imshow(im1, cmap=plt.cm.gray)
-    # plt.scatter(pos1[match_ind1, 0], pos1[match_ind1, 1], marker='.')
-    # plt.figure()
-    # plt.imshow(im2, cmap=plt.cm.gray)
-    # plt.scatter(pos2[:, 0], pos2[:, 1], marker='.')
-    # plt.figure()
-    # plt.imshow(im2, cmap=plt.cm.gray)
-    # plt.scatter(pos2[match_ind2, 0], pos2[match_ind2, 1], marker='.')
-    # plt.show()
+    plt.figure()
+    plt.imshow(im1, cmap=plt.cm.gray)
+    plt.figure()
+    plt.imshow(im2, cmap=plt.cm.gray)
+    plt.figure()
+    plt.imshow(im1, cmap=plt.cm.gray)
+    plt.scatter(pos1[:, 0], pos1[:, 1], marker='.')
+    plt.figure()
+    plt.imshow(im1, cmap=plt.cm.gray)
+    plt.scatter(pos1[match_ind1, 0], pos1[match_ind1, 1], marker='.')
+    plt.figure()
+    plt.imshow(im2, cmap=plt.cm.gray)
+    plt.scatter(pos2[:, 0], pos2[:, 1], marker='.')
+    plt.figure()
+    plt.imshow(im2, cmap=plt.cm.gray)
+    plt.scatter(pos2[match_ind2, 0], pos2[match_ind2, 1], marker='.')
+    plt.show()
 
 
 def testAppHom(im):
@@ -117,6 +117,7 @@ def testAppHom(im):
 
     H12 = np.diag([1, 2, 3])
     pos2 = sol4.apply_homography(pos1, H12)
+    print(pos2[0])
 
 
 def testRansac(im1):
@@ -134,11 +135,12 @@ def testRansac(im1):
     H12, inliers = sol4.ransac_homography(pos1[match_ind1, :],
                                           pos2[match_ind2, :],
                                           DEF_NUM_ITER, INLIER_TOL)
+    print(H12)
 
 def display_matches(im1):
     # im2 = sol4.read_image('external/backyard1.jpg', 1)
 
-    im2 = sol4.read_image('external/office3.jpg', 1)
+    im2 = sol4.read_image('external/office2.jpg', 1)
 
     pyr1, filter1 = sol4.build_gaussian_pyramid(im1, 3, 3)
     pos1, desc1 = sol4.find_features(pyr1)
@@ -287,8 +289,8 @@ def cutImages(im):
 def main():
     try:
         # im = sol4.read_image('external/backyard1.jpg', 1)
-        im = sol4.read_image('external/office2.jpg', 1)
-        for test in [testMatchFeatures]:
+        im = sol4.read_image('external/office1.jpg', 1)
+        for test in [display_matches]:
             test(im)
     except Exception as e:
         print('Failed test due to: {0}'.format(e))
