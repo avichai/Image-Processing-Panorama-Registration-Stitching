@@ -4,13 +4,10 @@ from scipy.ndimage.filters import convolve
 from scipy.ndimage import map_coordinates
 
 from ex4 import sol4_add
-from ex4 import  sol4_utils
-
-
+from ex4 import sol4_utils
 
 from random import sample
 import math
-
 
 # __________________________________________________________________________________________
 
@@ -43,18 +40,51 @@ SAMPLE_RATE = 2
 ROWS = 0
 COLS = 1
 
+# TODO:
+# 1. check returned types (np.float32?)
+# 2. import sol4_add?
+# 3. sol4_add imports sol4 (instead of from sol4 import *)
+# 4. remove asserts
+# 5. replaced +1 in pan boundaries in floor and ceil of min, max x,y, is it ok?
+# 6. check for 32 (and not 64) dtypes in code
+
+# =================================== imports =================================
+from scipy.ndimage import map_coordinates
+from random import sample
+from matplotlib import pyplot as plt
+from math import ceil, floor
+
+# ================================= constants =================================
+X_DER_KERNEL = np.array([1, 0, -1])[np.newaxis]
+Y_DER_KERNEL = np.transpose(X_DER_KERNEL)
+
+BLUR_KERNEL_SIZE = 3
+K_RESPONSE = 0.04
+
+DESC_PYR_LEVELS = 3
+
+SPREAD_CORNERS_M = 7  # todo: set params
+SPREAD_CORNERS_N = 7  # todo: set params
+SPREAD_CORNERS_RAD = 10  # todo: set params
+
+SAMPLE_DESC_RAD = 3
+
+HOMOGRAPHY_N_POINTS = 4
+
+N_COORS = 3
+
 
 # ============================== private functions ============================
-# def _get_level_coors(pos, from_level, to_level):
-#     """
-#     Converts the given point's coordinates from the pyramid's from_level to the pyramid's to_level
-#     :param pos: The coordinates of the points in the from_level (assumes pos.shape == (N, 2))
-#     :param from_level: The pyramid's level from which the coordinates are converted
-#     :param to_level: The pyramid's level to which the coordinates are converted
-#     :return: The coordinates of the given points in the to_level
-#     """
-#     levels_factor = (SAMPLE_RATE ** (from_level - to_level))
-#     return pos * [levels_factor, levels_factor]
+def _get_level_coors(pos, from_level, to_level):
+    """
+    Converts the given point's coordinates from the pyramid's from_level to the pyramid's to_level
+    :param pos: The coordinates of the points in the from_level (assumes pos.shape == (N, 2))
+    :param from_level: The pyramid's level from which the coordinates are converted
+    :param to_level: The pyramid's level to which the coordinates are converted
+    :return: The coordinates of the given points in the to_level
+    """
+    levels_factor = (SAMPLE_RATE ** (from_level - to_level))
+    return pos * [levels_factor, levels_factor]
 
 
 def _get_indices_offsets(rad):
@@ -64,7 +94,6 @@ def _get_indices_offsets(rad):
              the given radius: [-rad, -rad], [-rad, -rad+1], ..., [rad, rad-1], [rad, rad].
     """
     diam = rad * 2 + 1
-    # print(np.indices((diam, diam)).reshape(2, -1))
     return np.indices((diam, diam)).reshape(2, -1).T - rad
 
 
@@ -74,10 +103,7 @@ def _normalize_cols(matrix):
     :return: The Columns normalized input matrix
     """
     row_means = np.mean(matrix, axis=0)
-    print(row_means.shape)
-    print(row_means[1])
     norm_factors = np.linalg.norm(matrix, axis=0)
-    print(norm_factors[1])
     norm_factors[norm_factors == 0] = 1
     return (matrix - row_means) / norm_factors
 
@@ -271,9 +297,9 @@ def _calc_im_strip(pan_strip_left_boundary, pan_strip_right_boundary, min_y,
 #     y_der = convolve(im, Y_DER_KERNEL)
 #
 #     # blurring the derivatives matrices
-#     x_der_2 = blur_spatial(np.square(x_der), BLUR_KERNEL_SIZE)
-#     y_der_2 = blur_spatial(np.square(y_der), BLUR_KERNEL_SIZE)
-#     x_der_y_der = blur_spatial(x_der * y_der, BLUR_KERNEL_SIZE)
+#     x_der_2 = sol4_utils.blur_spatial(np.square(x_der), BLUR_KERNEL_SIZE)
+#     y_der_2 = sol4_utils.blur_spatial(np.square(y_der), BLUR_KERNEL_SIZE)
+#     x_der_y_der = sol4_utils.blur_spatial(x_der * y_der, BLUR_KERNEL_SIZE)
 #
 #     # calculating the matrices's determinants and traces
 #     det_m = x_der_2 * y_der_2 - (np.square(x_der_y_der))
@@ -281,14 +307,23 @@ def _calc_im_strip(pan_strip_left_boundary, pan_strip_right_boundary, min_y,
 #
 #     # calculating the response image
 #     response_im = det_m - K_RESPONSE * (np.square(trace_m))
-#     local_max_response_im = non_maximum_suppression(response_im)
+#     local_max_response_im = sol4_add.non_maximum_suppression(response_im)
 #
 #     # swap rows and cols to sustain coordinate convention
 #     return np.argwhere(local_max_response_im)[:, [1, 0]]
 
 
+
+
 # def sample_descriptor(im, pos, desc_rad):
-#
+#     """
+#     :param im: grayscale image to sample within
+#     :param pos: An array with shape (N,2) of [x,y] positions to sample descriptors in im
+#     :param desc_rad: ”Radius” of descriptors to compute
+#     :return: A 3D array with shape (K,K,N) containing the ith descriptor at desc(:,:,i).
+#              The per−descriptor dimensions KxK are related to the desc rad argument as follows
+#              K = 1+2∗desc rad.
+#     """
 #     # calculating the descriptor's diameter and size
 #     desc_diam = 2 * desc_rad + 1
 #     desc_size = desc_diam ** 2
@@ -314,6 +349,7 @@ def _calc_im_strip(pan_strip_left_boundary, pan_strip_right_boundary, min_y,
 #     return norm_descs_cols.reshape(desc_diam, desc_diam, len_points)
 
 
+
 # def find_features(pyr):
 #     """
 #     :param pyr: Gaussian pyramid of a grayscale image having 3 levels
@@ -327,8 +363,8 @@ def _calc_im_strip(pan_strip_left_boundary, pan_strip_right_boundary, min_y,
 #     pos_top_level = _get_level_coors(pos, 0, pyr_top_level_ind)
 #     desc = sample_descriptor(pyr[pyr_top_level_ind], pos_top_level, SAMPLE_DESC_RAD)
 #     return pos, desc
-
-
+#
+#
 # def match_features(desc1, desc2, min_score):
 #     """
 #     :param desc1: A feature descriptor array with shape (K,K,N1)
@@ -363,7 +399,7 @@ def _calc_im_strip(pan_strip_left_boundary, pan_strip_right_boundary, min_y,
 #     return matches_inds[:, 0], matches_inds[:, 1]
 
 
-# def apply_homography1(pos1, H12):
+# def apply_homography(pos1, H12):
 #     """
 #     :param pos1: An array with shape (N,2) of [x,y] point coordinates
 #     :param H12: A 3x3 homography matrix
@@ -373,9 +409,8 @@ def _calc_im_strip(pan_strip_left_boundary, pan_strip_right_boundary, min_y,
 #     # adding 1 to 3rd coordinate to maintain homogeneous coordinates
 #     hom_pos1_T = np.hstack((pos1, np.ones((pos1.shape[0], 1)))).T
 #     non_hom_pos2_T = np.dot(H12, hom_pos1_T)
-#     non_hom_pos2_T[-1, :][non_hom_pos2_T[-1, :] == 0] = 1e-100  # todo rm
-#     pos2_T = non_hom_pos2_T[:-1, :] / non_hom_pos2_T[-1,
-#                                       :]  # todo check for 0 division
+#     non_hom_pos2_T[-1, :][non_hom_pos2_T[-1, :]==0] = 1e-100    #todo rm
+#     pos2_T = non_hom_pos2_T[:-1, :] / non_hom_pos2_T[-1, :]     # todo check for 0 division
 #     return pos2_T.T
 
 
@@ -390,8 +425,8 @@ def _calc_im_strip(pan_strip_left_boundary, pan_strip_right_boundary, min_y,
 #                                 containing the indices in pos1/pos2 of the maximal set of inlier
 #                                 matches found
 #     """
-#     assert (len(pos1) == len(pos2))  # todo rm
-#     assert (len(pos1) > 4)  # todo rm
+#     assert(len(pos1) == len(pos2))  # todo rm
+#     assert(len(pos1) > 4)  # todo rm
 #
 #     n_pos = len(pos1)
 #     indices = range(n_pos)
@@ -400,7 +435,7 @@ def _calc_im_strip(pan_strip_left_boundary, pan_strip_right_boundary, min_y,
 #     max_inliers_inds = None
 #     max_n_inliers = -np.inf
 #
-#     s, f = 0, 0  # todo rm
+#     s, f = 0, 0 #todo rm
 #
 #     for i in range(num_iters):
 #         # calculating homography based on random sampled points
@@ -408,9 +443,9 @@ def _calc_im_strip(pan_strip_left_boundary, pan_strip_right_boundary, min_y,
 #         p1, p2 = pos1[random_indices], pos2[random_indices]
 #         hom = sol4_add.least_squares_homography(p1, p2)
 #         if hom is None:
-#             f += 1  # todo rm
+#             f += 1#todo rm
 #             continue
-#         s += 1  # todo rm
+#         s +=1 #todo rm
 #
 #         pos2_tag = apply_homography(pos1, hom)
 #         error = np.sum(np.square(pos2_tag - pos2), axis=1)
@@ -421,16 +456,16 @@ def _calc_im_strip(pan_strip_left_boundary, pan_strip_right_boundary, min_y,
 #             max_inliers_inds = inliers_inds
 #             max_n_inliers = n_inliers
 #
-#     print('s =', s)  # todo rm
-#     print('f =', f)  # todo rm
+#     print('s =', s)#todo rm
+#     print('f =', f)#todo rm
 #
 #     # calculating the final homography based on the largest set of inliers points
 #     max_p1, max_p2 = pos1[max_inliers_inds, :], pos2[max_inliers_inds, :]
 #     max_hom = sol4_add.least_squares_homography(max_p1, max_p2)
 #     return max_hom, max_inliers_inds
-
-
-# def display_matches1(im1, im2, pos1, pos2, inliers):
+#
+#
+# def display_matches(im1, im2, pos1, pos2, inliers):
 #     """
 #     :param im1: grayscale image
 #     :param im2: grayscale image
@@ -459,7 +494,15 @@ def _calc_im_strip(pan_strip_left_boundary, pan_strip_right_boundary, min_y,
 #     _plot_lines(pos1_outliers, pos2_outliers, 'blue')
 
 
-# def accumulate_homographies2(H_successive, m):
+# def accumulate_homographies(H_successive, m):
+#     """
+#     :param H_successive: A list of M−1 3x3 homography matrices where H successive[i] is a homography
+#                          that transforms points from coordinate system i to coordinate system i+1
+#     :param m: Index of the coordinate system we would like to accumulate the given homographies
+#               towards
+#     :return: A list of M 3x3 homography matrices, where H2m[i] transforms points from coordinate
+#              system i to coordinate system m
+#     """
 #     # splitting the Hs to left and inverse right Hs
 #     left_Hs = H_successive[:m]
 #     right_Hs = H_successive[m:]
@@ -482,7 +525,7 @@ m = 0
 ma = None
 
 
-def render_panorama(ims, Hs):
+def render_panorama1(ims, Hs):
     """
     :param ims: A list of grayscale images
     :param Hs: A list of 3x3 homography matrices. Hs[i] is a homography that transforms points from
@@ -554,9 +597,19 @@ def render_panorama(ims, Hs):
         # plt.show()
 
         # panorama[:, left_boundary:right_boundary] = im_strip
-        panorama = sol4_utils.pyramid_blending(panorama, pan_strip, mask, 2, 9, 9)
+        panorama = sol4_utils.pyramid_blending(panorama, pan_strip, mask, 2, 9,
+                                               9)
 
     return panorama
+
+
+# # todo: remove, used for school script
+# def im_to_points(im):
+#     pyr = sol4_utils.build_gaussian_pyramid(im, 3, 3)[0]
+#     pos, desc = find_features(pyr)
+#     points = pos[:, [1, 0]]
+#     return points, desc
+
 
 
 # # todo: remove, used for school script
@@ -579,21 +632,22 @@ DEFAULT_RADIUS = 10
 DEF_N = 7
 DEF_M = 7
 
+
 def harris_corner_detector(im):
     '''
     Finding haris point of interest
     :param im: grayscale image to find key points inside
     :return: An array with shape (N,2) of [x,y] key points locations in im
     '''
-    # derX1, derY2 = conv_der(im)
-    # print(derX1)
     derX = convolve(im, DER_VEC)
     derY = convolve(im, np.transpose(DER_VEC))
-    # print(derX1 == derX)
 
-    bluredSquaredDerX = sol4_utils.blur_spatial(np.multiply(derX, derX), DEFAULT_KER_SIZE)
-    bluredSquaredDerY = sol4_utils.blur_spatial(np.multiply(derY, derY), DEFAULT_KER_SIZE)
-    bluredDerXderY = sol4_utils.blur_spatial(np.multiply(derX, derY), DEFAULT_KER_SIZE)
+    bluredSquaredDerX = sol4_utils.blur_spatial(np.multiply(derX, derX),
+                                                DEFAULT_KER_SIZE)
+    bluredSquaredDerY = sol4_utils.blur_spatial(np.multiply(derY, derY),
+                                                DEFAULT_KER_SIZE)
+    bluredDerXderY = sol4_utils.blur_spatial(np.multiply(derX, derY),
+                                             DEFAULT_KER_SIZE)
 
     det = np.multiply(bluredSquaredDerX, bluredSquaredDerY) - \
           np.multiply(bluredDerXderY, bluredDerXderY)
@@ -660,7 +714,6 @@ def find_features(pyr):
     pos = sol4_add.spread_out_corners(pyr[ORIG_IM], DEF_N, DEF_M,
                                       DEFAULT_RADIUS)
     desc = sample_descriptor(pyr[2], pos * [0.25, 0.25], DEFAULT_DESC_RAD)
-    # print(desc.shape)
     return pos, desc
 
 
@@ -717,9 +770,12 @@ def apply_homography(pos1, H12):
     coordinates in image i+1 obtained from transforming pos1 using H12.
 
     '''
+    # print(H12)
     homPos1 = np.ones((pos1.shape[0], 3))
     homPos1[:, 0:2] = pos1
+    # print(homPos1)
     homPos2 = np.dot(H12, np.transpose(homPos1))
+    homPos2[2, :][homPos2[2, :] == 0] += 1e-50
     pos2 = np.zeros(pos1.shape)
     pos2[:, 0] = np.transpose(np.divide(homPos2[0, :], homPos2[2, :]))
     pos2[:, 1] = np.transpose(np.divide(homPos2[1, :], homPos2[2, :]))
@@ -794,23 +850,23 @@ def display_matches(im1, im2, pos1, pos2, inliers):
     stackedIm = np.hstack((im1,
                            im2))  # todo check if it ok meaning there could not be 2 images with different shapes
     newPos2 = np.zeros(pos2.shape)
-    newPos2[:, 0] = pos2[:, 0] + im1.shape[COLS]
-    newPos2[:, 1] = pos2[:, 1]
+    newPos2[:, 0] = pos2[:, 0]
+    newPos2[:, 1] = pos2[:, 1] + im1.shape[COLS]
     plt.figure()
     plt.imshow(stackedIm, cmap=plt.cm.gray)
-    plt.scatter(pos1[:, 0], pos1[:, 1], c='red', marker='.')
-    plt.scatter(newPos2[:, 0], newPos2[:, 1], c='red', marker='.')
+    plt.scatter(pos1[:, 1], pos1[:, 0], c='red', marker='.')
+    plt.scatter(newPos2[:, 1], newPos2[:, 0], c='red', marker='.')
 
     for i in range(pos1.shape[0]):
-        plt.plot([pos1[i, 0], newPos2[i, 0]], [pos1[i, 1], newPos2[i, 1]], 'b',
+        plt.plot([pos1[i, 1], newPos2[i, 1]], [pos1[i, 0], newPos2[i, 0]], 'b',
                  linewidth=0.3)
 
-    print(inliers.shape)
+    # print(inliers.shape)
     for j in range(inliers.shape[0]):
-        plt.plot([pos1[inliers[j], 0], newPos2[inliers[j], 0]],
-                 [pos1[inliers[j], 1], newPos2[inliers[j], 1]], 'y',
+        plt.plot([pos1[inliers[j], 1], newPos2[inliers[j], 1]],
+                 [pos1[inliers[j], 0], newPos2[inliers[j], 0]], 'y',
                  linewidth=1)
-    plt.show()
+        # plt.show() #todo add or remove
 
 
 def accumulate_homographies(H_successive, m):
@@ -836,7 +892,7 @@ def accumulate_homographies(H_successive, m):
 
     currH = np.eye(3)
     for i in range(len(H_successive) - m):
-        tmp = np.dot(np.linalg.inv(H_successive[m + i]), currH)
+        tmp = np.dot(currH, np.linalg.inv(H_successive[m + i]))  # todo check
         H2m[:, :, m + 1 + i] = np.divide(tmp, tmp[2, 2])
         currH = H2m[:, :, m + 1 + i]
     return [H2m[:, :, i] for i in range(H2m.shape[2])]

@@ -292,7 +292,7 @@ def main():
     try:
         # im = sol4_utils.read_image('external/backyard1.jpg', 1)
         im = sol4_utils.read_image('external/office1.jpg', 1)
-        for test in [testAccHom]:
+        for test in [display_matches]:
             test(im)
     except Exception as e:
         print('Failed test due to: {0}'.format(e))

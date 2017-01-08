@@ -1,5 +1,5 @@
-1. harris - do i get rows or cols since in the image when i use scatter it's the opposite.
 2. check if it ok meaning there could not be 2 images with different shapes
-3. check why don't i get good features
-4. check why am i failing from time to time
 5. check if only 2 the power for blending is good
+6. check if i need to use plt.show() in display matches / panorama example
+7. todo roee please notice that on ransac_homography you return An Array with shape (S,) where S while you return indices of the entire vec!
+8. fix render panorama!!!
