@@ -2,10 +2,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-import time as time
-
-from ex4 import sol4
-from ex4 import sol4_utils
+import time as time  # todo remove
+from ex4 import sol4  # todo remove from ex4
+from ex4 import sol4_utils  # todo remove from ex4
 
 
 def generate_panorama(data_dir, file_prefix, num_images, figsize=(20, 20)):
@@ -19,9 +18,8 @@ def generate_panorama(data_dir, file_prefix, num_images, figsize=(20, 20)):
 
     # Extract feature point locations and descriptors.
     def im_to_points(im):
-        pyr, _ = sol4_utils.build_gaussian_pyramid(im, 3, 3)
-        pos, desc = sol4.find_features(pyr)
-        return pos[:, [1, 0]], desc
+        pyr, _ = sol4_utils.build_gaussian_pyramid(im, 3, 7)
+        return sol4.find_features(pyr)
 
     p_d = [im_to_points(im) for im in ims]
 
@@ -32,12 +30,11 @@ def generate_panorama(data_dir, file_prefix, num_images, figsize=(20, 20)):
         desc1, desc2 = p_d[i][1], p_d[i + 1][1]
 
         # Find matching feature points.
-        ind1, ind2 = sol4.match_features(desc1, desc2, 0.0)
+        ind1, ind2 = sol4.match_features(desc1, desc2, .7)
         points1, points2 = points1[ind1, :], points2[ind2, :]
 
         # Compute homography using RANSAC.
         H12, inliers = sol4.ransac_homography(points1, points2, 10000, 6)
-        # H12, inliers = sol4.ransac_homography(points1, points2, 1000, 6)
 
         # Display inlier and outlier matches.
         sol4.display_matches(ims[i], ims[i + 1], points1, points2,
@@ -46,14 +43,11 @@ def generate_panorama(data_dir, file_prefix, num_images, figsize=(20, 20)):
 
     # Compute composite homographies from the panorama coordinate system.
     Htot = sol4.accumulate_homographies(Hs, (num_images - 1) // 2)
-    # Htot1 = sol4.accumulate_homographies1(Hs, (num_images - 1) // 2)
 
     # Final panorama is generated using 3 channels of the RGB images
     ims_rgb = [sol4_utils.read_image(f, 2) for f in files]
 
     # Render panorama for each color channel and combine them.
-    panorama = [sol4.render_panorama1([im[..., i] for im in ims_rgb], Htot) for i
-                in range(3)]
     panorama = [sol4.render_panorama([im[..., i] for im in ims_rgb], Htot) for i
                 in range(3)]
     panorama = np.dstack(panorama)
@@ -61,9 +55,7 @@ def generate_panorama(data_dir, file_prefix, num_images, figsize=(20, 20)):
     # plot the panorama
     plt.figure(figsize=figsize)
     plt.imshow(panorama.clip(0, 1))
-
-    print(time.time() - t)
-
+    print(time.time()-t)
     plt.show()
 
 

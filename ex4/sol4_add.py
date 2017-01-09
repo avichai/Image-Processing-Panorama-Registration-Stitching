@@ -65,7 +65,7 @@ def spread_out_corners(im, m, n, radius):
    Returns:
     An array with shape (N,2), where ret[i,:] are the [x,y] coordinates of the ith corner points.
   """
-  from ex4.sol4 import harris_corner_detector
+  from sol4 import harris_corner_detector
   corners = [np.empty((0,2), dtype=np.int)]
   x_bound = np.linspace(0, im.shape[1], n+1, dtype=np.int)
   y_bound = np.linspace(0, im.shape[0], m+1, dtype=np.int)
