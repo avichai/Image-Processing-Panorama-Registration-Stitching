@@ -52,6 +52,8 @@ def generate_panorama(data_dir, file_prefix, num_images, figsize=(20, 20)):
     ims_rgb = [sol4_utils.read_image(f, 2) for f in files]
 
     # Render panorama for each color channel and combine them.
+    panorama = [sol4.render_panorama1([im[..., i] for im in ims_rgb], Htot) for i
+                in range(3)]
     panorama = [sol4.render_panorama([im[..., i] for im in ims_rgb], Htot) for i
                 in range(3)]
     panorama = np.dstack(panorama)
@@ -63,9 +65,6 @@ def generate_panorama(data_dir, file_prefix, num_images, figsize=(20, 20)):
     print(time.time() - t)
 
     plt.show()
-
-
-
 
 
 def main():

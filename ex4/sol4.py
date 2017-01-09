@@ -525,7 +525,7 @@ m = 0
 ma = None
 
 
-def render_panorama1(ims, Hs):
+def render_panorama3(ims, Hs):
     """
     :param ims: A list of grayscale images
     :param Hs: A list of 3x3 homography matrices. Hs[i] is a homography that transforms points from
@@ -910,17 +910,25 @@ def render_panorama(ims, Hs):
     backwarped using homographies from Hs, one from every image in ims.
     '''
 
-    minX, minY, maxX, maxY = getMaxAndMin(ims, Hs)
+    minX, minY, maxX, maxY, edges, homEdges = getMaxAndMin(ims, Hs)
     rows = maxY - minY + 1
     cols = maxX - minX + 1
     panorama = np.zeros((rows, cols))
+    # print(minX)
+    # print(minY)
+    # print(maxX)
+    # print(maxY)
+    # print(panorama.shape)
     xPanoVals, yPanoVals = np.meshgrid(np.linspace(minX, maxX, cols),
                                        np.linspace(minY, maxY, rows))
 
-    stripesBound = findBounds(ims, Hs)
+    stripesBound = findBounds(ims, Hs, edges, homEdges)
+    print(stripesBound)
     stripesBound -= minX
     stripesBound = np.append([0], stripesBound)
     stripesBound = np.append(stripesBound, [cols])
+
+    print(stripesBound)
 
     firstImGridX = xPanoVals[:, :stripesBound[2]]
     firstImGridY = yPanoVals[:, :stripesBound[2]]
@@ -937,7 +945,6 @@ def render_panorama(ims, Hs):
                                                     order=1,
                                                     prefilter=False).reshape(
         panorama[:, :stripesBound[2]].shape)
-    # print(panorama[:, :stripesBound[2]])
 
     for i in range(len(stripesBound) - 3):
         gridX = xPanoVals[:, stripesBound[i]:stripesBound[3 + i]]
@@ -995,6 +1002,66 @@ def render_panorama(ims, Hs):
         len(stripesBound) - 1]] = stitch(oldStripe, lastStripe)
 
     return panorama
+
+
+def render_panorama1(ims, Hs):
+    """
+    :param ims: A list of grayscale images
+    :param Hs: A list of 3x3 homography matrices. Hs[i] is a homography that transforms points from
+               the coordinate system of ims [i] to the coordinate system of the panorama
+    :return: A grayscale panorama image composed of vertical strips, backwarped using homographies
+             from Hs, one from every image in ims
+    """
+    pan_boundaries, pan_strips_boundaries, pan_masks_boundaries = _get_panorama_boundaries(
+        ims, Hs)
+
+    print(pan_strips_boundaries.shape)
+    print(pan_strips_boundaries)
+    min_x, max_x, min_y, max_y = pan_boundaries
+
+    if min_x % 2:  # todo rm (should affect only blending not entrire pan)
+        min_x -= 1  # todo rm
+    if max_x % 2:  # todo rm
+        max_x += 1  # todo rm
+    if min_y % 2:  # todo rm
+        min_y -= 1  # todo rm
+    if max_y % 2:  # todo rm
+        max_y += 1  # todo rm
+
+    pan_n_rows = max_y - min_y  # todo: if rounding in min,max then +1 is redundant (but if not rounding how shouold use meshgrid?), if removing, serach in code for "PLUS_ONE_SEARCH"
+    pan_n_cols = max_x - min_x
+
+    panorama = np.zeros((pan_n_rows, pan_n_cols))
+    n_ims = len(ims)
+    for i in range(n_ims):
+        pan_strip_left_boundary, pan_strip_right_boundary = \
+            pan_strips_boundaries[i]
+        im_strip = _calc_im_strip(pan_strip_left_boundary,
+                                  pan_strip_right_boundary, min_y, max_y,
+                                  ims[i], Hs[i])
+
+        # switching to real panorama image coordinates
+        left_boundary, right_boundary = pan_strip_left_boundary - min_x, pan_strip_right_boundary - min_x
+
+        # the leftmost first image
+        if i == 0:
+            panorama[:, left_boundary:right_boundary] = im_strip
+            continue
+
+        pan_strip = np.zeros_like(panorama)
+        pan_strip[:, left_boundary:right_boundary] = im_strip
+
+        # mask = np.zeros_like(panorama, dtype=np.bool)
+        # mask_boundary = pan_masks_boundaries[i-1] - min_x
+        # mask[:, :mask_boundary] = True
+
+        # todo: bonus impl (question in forum about diff masks for diff colors)
+        overlap_left_boundary, overlap_right_boundary = left_boundary, \
+                                                        pan_strips_boundaries[
+                                                            i - 1][1] - min_x
+        mask = _get_min_cut_mask(overlap_left_boundary, overlap_right_boundary,
+                                 panorama, pan_strip)
+
 
 
 def stitch(firstStripe, secStripe):
@@ -1072,32 +1139,65 @@ def stitch(firstStripe, secStripe):
     return res[:rows, :cols]
 
 
-def findBounds(ims, Hs):
+def findBounds(ims, homEdges):
     '''
     find the strips x bounds
     :param Hs: A list of 3x3 homography matrices. Hs[i] is a homography
     that transforms points from the coordinate system of ims [i] to the
     coordinate system of the panorama. (Python list)
     :param ims: A list of grayscale images. (Python list)
+    :param edges: im edges
+    :param homEdges: hom edges
     :return: the strips x bounds
     '''
 
-    bounds = np.zeros(len(ims) - 1).astype(np.int64)
+    centers = []
+    for i in range(len(ims)):
+        rows, cols = ims[i].shape
+        centers.append(np.array([rows // 2, cols // 2]))
 
-    for i in range(len(ims) - 1):
-        xIcenter = np.ceil(ims[i].shape[COLS] / 2)
-        yIcenter = np.ceil(ims[i].shape[ROWS] / 2)
-        xIp1center = np.ceil(ims[i + 1].shape[COLS] / 2)
-        yIp1center = np.ceil(ims[i].shape[ROWS] / 2)
+    xEdges = homEdges[:, 1]
+    yEdges = homEdges[:, 0]
 
-        ihomCenter = apply_homography(
-            np.array([xIcenter, yIcenter]).reshape(1, 2), Hs[i])
-        ip1homCenter = apply_homography(
-            np.array([xIp1center, yIp1center]).reshape(1, 2), Hs[i + 1])
+    tmpXedges = xEdges.reshape(len(ims), 4)
+    strips = np.transpose(np.vstack((np.min(tmpXedges[:, [0, 1]], axis=1),
+                                     np.max(tmpXedges[:, [2, 3]], axis=1)))).astype(np.int64)
+    return strips
 
-        bounds[i] = np.ceil((ihomCenter[0][ROWS] + ip1homCenter[0][ROWS]) / 2)
 
-    return bounds
+    # bounds = np.zeros(len(ims) - 1).astype(np.int64)
+    #
+    # for i in range(len(ims) - 1):
+    #     xIcenter = np.ceil(ims[i].shape[COLS] / 2)
+    #     yIcenter = np.ceil(ims[i].shape[ROWS] / 2)
+    #     xIp1center = np.ceil(ims[i + 1].shape[COLS] / 2)
+    #     yIp1center = np.ceil(ims[i].shape[ROWS] / 2)
+    #
+    #     ihomCenter = apply_homography(
+    #         np.array([xIcenter, yIcenter]).reshape(1, 2), Hs[i])
+    #     ip1homCenter = apply_homography(
+    #         np.array([xIp1center, yIp1center]).reshape(1, 2), Hs[i + 1])
+    #
+    #     bounds[i] = np.ceil((ihomCenter[0][ROWS] + ip1homCenter[0][ROWS]) / 2)
+    #
+    # return bounds
+
+def getMaskBound(ims, Hs, edges, homEdges):
+    print(strips)
+
+    # calculating the strips boundaries
+    pan_corners_xs_matrix = pan_corners_xs.reshape(n_ims, 4)
+    pan_left_boundaries = np.min(pan_corners_xs_matrix[:, [0, 1]], axis=1)
+    pan_right_boundaries = np.max(pan_corners_xs_matrix[:, [2, 3]], axis=1)
+    pan_strips_boundaries = np.vstack(
+        (pan_left_boundaries, pan_right_boundaries)).T.astype(np.int64)
+
+    # calculating the masks boundaries
+    pan_x_centers = [apply_homography(im_center[np.newaxis], H)[0][1] for
+                     (im_center, H) in zip(ims_centers, Hs)]
+    pan_masks_boundaries = [int((pan_x_centers[i] + pan_x_centers[i + 1]) // 2)
+                            for i in range(n_ims - 1)]
+    pass
 
 
 def getMaxAndMin(ims, Hs):
@@ -1112,10 +1212,11 @@ def getMaxAndMin(ims, Hs):
 
     numIm = len(ims)
     xAndy = np.zeros((4 * numIm, 2))
+    edges = None
     for i in range(numIm):
         numRows, numCols = ims[i].shape
-        edges = [[0, 0], [numCols - 1, 0], [0, numRows - 1],
-                 [numCols - 1, numRows - 1]]
+        edges = [[0, 0], [numRows - 1, 0], [0, numCols - 1],
+                 [numRows - 1, numCols - 1]]
         edges = np.array(edges)
         homEdges = apply_homography(edges, Hs[i])
         # print(homEdges)
@@ -1124,7 +1225,7 @@ def getMaxAndMin(ims, Hs):
         xAndy[4 * i + 2] = homEdges[2]
         xAndy[4 * i + 3] = homEdges[3]
 
-    return [np.floor(np.min(xAndy[:, 0])).astype(np.int64),
-            np.floor(np.min(xAndy[:, 1])).astype(np.int64),
-            np.ceil(np.max(xAndy[:, 0])).astype(np.int64),
-            np.ceil(np.max(xAndy[:, 1])).astype(np.int64)]
+    return [np.floor(np.min(xAndy[:, 1])).astype(np.int64),
+            np.floor(np.min(xAndy[:, 0])).astype(np.int64),
+            np.ceil(np.max(xAndy[:, 1])).astype(np.int64),
+            np.ceil(np.max(xAndy[:, 0])).astype(np.int64), edges, xAndy]

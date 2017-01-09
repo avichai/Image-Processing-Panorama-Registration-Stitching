@@ -10,8 +10,8 @@ DEF_NUM_ITER = 1000
 
 DEF_MIN_SCORE = 0.0
 
-def testHarris(im):
 
+def testHarris(im):
     pos = sol4.harris_corner_detector(im)
 
     plt.figure()
@@ -20,6 +20,7 @@ def testHarris(im):
     plt.imshow(im, cmap=plt.cm.gray)
     plt.scatter(pos[:, 0], pos[:, 1], marker='.')
     plt.show()
+
 
 def testSampleDesc(im):
     pyr_im, filter = sol4.build_gaussian_pyramid(im, 3, 3)
@@ -34,6 +35,7 @@ def testSampleDesc(im):
     # print(a)
     #
     # print(ndimage.map_coordinates(a, [[2.5, 2], [0.5, 1]], order=1))
+
 
 def testFindFeatures(im):
     pyr, filter = sol4.build_gaussian_pyramid(im, 3, 3)
@@ -50,9 +52,9 @@ def testFindFeatures(im):
 
 
 def randomTest(im):
-    x = np.array([1,2,3])
-    y = np.array([4,5,6, 7, 8])
-    xv , yv = np.meshgrid(x, y)
+    x = np.array([1, 2, 3])
+    y = np.array([4, 5, 6, 7, 8])
+    xv, yv = np.meshgrid(x, y)
     print(xv)
     print(yv)
 
@@ -77,13 +79,10 @@ def randomTest(im):
     # print(match_ind1, match_ind2)
 
 
-
 def testMatchFeatures(im1):
-
     # todo this is the same picture try different ones
     # im2 = sol4.read_image('external/backyard1.jpg', 1)
     im2 = sol4_utils.read_image('external/office2.jpg', 1)
-
 
     pyr1, filter1 = sol4_utils.build_gaussian_pyramid(im1, 3, 3)
     pos1, desc1 = sol4.find_features(pyr1)
@@ -122,8 +121,6 @@ def testAppHom(im):
 
 
 def testRansac(im1):
-
-
     im2 = sol4_utils.read_image('external/office2.jpg', 1)
 
     pyr1, filter1 = sol4_utils.build_gaussian_pyramid(im1, 3, 3)
@@ -137,6 +134,7 @@ def testRansac(im1):
                                           pos2[match_ind2, :],
                                           DEF_NUM_ITER, INLIER_TOL)
     print(H12)
+
 
 def display_matches(im1):
     # im2 = sol4.read_image('external/backyard1.jpg', 1)
@@ -154,7 +152,8 @@ def display_matches(im1):
                                           pos2[match_ind2, :],
                                           DEF_NUM_ITER, INLIER_TOL)
 
-    sol4.display_matches(im1, im2, pos1[match_ind1, :], pos2[match_ind2, :], inliers)
+    sol4.display_matches(im1, im2, pos1[match_ind1, :], pos2[match_ind2, :],
+                         inliers)
 
 
 def testAccHom(im1):
@@ -170,8 +169,8 @@ def testAccHom(im1):
     match_ind1, match_ind2 = sol4.match_features(desc1, desc2, DEF_MIN_SCORE)
 
     H12, inliers1 = sol4.ransac_homography(pos1[match_ind1, :],
-                                          pos2[match_ind2, :],
-                                          DEF_NUM_ITER, INLIER_TOL)
+                                           pos2[match_ind2, :],
+                                           DEF_NUM_ITER, INLIER_TOL)
 
     pyr1, filter1 = sol4_utils.build_gaussian_pyramid(im2, 3, 3)
     pos1, desc1 = sol4.find_features(pyr1)
@@ -181,8 +180,8 @@ def testAccHom(im1):
     match_ind1, match_ind2 = sol4.match_features(desc1, desc2, DEF_MIN_SCORE)
 
     H23, inliers2 = sol4.ransac_homography(pos1[match_ind1, :],
-                                          pos2[match_ind2, :],
-                                          DEF_NUM_ITER, INLIER_TOL)
+                                           pos2[match_ind2, :],
+                                           DEF_NUM_ITER, INLIER_TOL)
 
     pyr1, filter1 = sol4_utils.build_gaussian_pyramid(im3, 3, 3)
     pos1, desc1 = sol4.find_features(pyr1)
@@ -192,12 +191,12 @@ def testAccHom(im1):
     match_ind1, match_ind2 = sol4.match_features(desc1, desc2, DEF_MIN_SCORE)
 
     H34, inliers3 = sol4.ransac_homography(pos1[match_ind1, :],
-                                          pos2[match_ind2, :],
-                                          DEF_NUM_ITER, INLIER_TOL)
+                                           pos2[match_ind2, :],
+                                           DEF_NUM_ITER, INLIER_TOL)
 
     H_successive = [H12, H23, H34]
 
-    m = (len(H_successive)-1)//2
+    m = (len(H_successive) - 1) // 2
 
     H2m = sol4.accumulate_homographies(H_successive, m)
     # tmp = sol4.accumulate_homographies1(H_successive, m)
@@ -250,7 +249,7 @@ def testRenderPan(im1):
 
     H_successive = [H12, H23, H34]
 
-    m = (len(H_successive)-1)//2
+    m = (len(H_successive) - 1) // 2
 
     H2m = sol4.accumulate_homographies(H_successive, m)
     ims = [im1, im2, im3, im4]
@@ -269,8 +268,6 @@ def cutImages(im):
              :2 ** (np.uint(np.floor(np.log2(im.shape[0])))),
              :2 ** (np.uint(np.floor(np.log2(im.shape[1]))))]
     return cutIm1
-
-
 
 
 # randomTest
@@ -297,6 +294,7 @@ def main():
     except Exception as e:
         print('Failed test due to: {0}'.format(e))
         exit(-1)
+
 
 if __name__ == '__main__':
     main()
