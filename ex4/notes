@@ -1,6 +1,0 @@
-1. check if it ok meaning there could not be 2 images with different shapes
-2. check if only 2 the power for blending is good
-3. check if i need to use plt.show() in display matches / panorama example
-4. fix render panorama!!!
-5. check defaults size for everything - meaning change constant!!!
-6. do your own panoramas!
