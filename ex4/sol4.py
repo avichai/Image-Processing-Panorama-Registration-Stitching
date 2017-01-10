@@ -591,7 +591,9 @@ DEF_N = 3
 DEF_M = 3
 ITER_FIRST_IMAGE = 0
 EXPAND_FOR_BLEND_FACTOR = 0.4
-PYR_LEVEL = 4
+PYR_LEVEL = 4 #todo change
+DEF_FILTER_IM = 7 #todo change
+DEF_FILTER_MASK = 7 #todo change
 
 
 def harris_corner_detector(im):
@@ -935,7 +937,8 @@ def render_panorama(ims, Hs):
         # print(panorama.shape)
         # print(dupPanForBlend.shape)
         panorama = sol4_utils.pyramid_blending(panorama, dupPanForBlend, mask,
-                                               PYR_LEVEL, 7, 7)
+                                               PYR_LEVEL, DEF_FILTER_IM,
+                                               DEF_FILTER_MASK)
 
 
 

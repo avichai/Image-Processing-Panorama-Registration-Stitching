@@ -3,3 +3,5 @@
 6. check if i need to use plt.show() in display matches / panorama example
 7. todo roee please notice that on ransac_homography you return An Array with shape (S,) where S while you return indices of the entire vec!
 8. fix render panorama!!!
+9. check defaults size for everything
+10. do your own panoramas!
