@@ -1,0 +1,21 @@
+I've implemented the dynamic programing for stitching.
+
+I've done it using the algorithm learned in class.
+
+For every 2 stripes that I've wanted to blend I did:
+1. calculated the squared difference between them
+2. calculated the cumulative matrix of the difference and the path from
+each cell backwards.
+3. find the path from the last row of the strip to the top.
+4. create a mask where everything to the left of the path in the mask
+is True and all others arr False.
+5. blend the 2 stripes with the mask.
+
+eventually return the blended panorama.
+
+Note: in order to blend the stipes successfuly I've shrinked the stripes
+to blend since when I do not shrink it the algorithm prefers to take
+the left or the right most column path and that's not working very well.
+By shrinking the stipe we enforce the path to go somewhere in the
+middle of the stripe which makes some of the blended stripe to come from the
+left and some from the right stripe.

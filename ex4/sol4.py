@@ -592,8 +592,8 @@ DEF_M = 3
 ITER_FIRST_IMAGE = 0
 EXPAND_FOR_BLEND_FACTOR = 0.4
 PYR_LEVEL = 4 #todo change
-DEF_FILTER_IM = 7 #todo change
-DEF_FILTER_MASK = 7 #todo change
+DEF_FILTER_IM = 3 #todo change
+DEF_FILTER_MASK = 3 #todo change
 
 
 def harris_corner_detector(im):
@@ -932,15 +932,9 @@ def render_panorama(ims, Hs):
         path = path + newL
 
         mask = np.transpose(np.transpose(np.indices(panorama.shape)[1]) < path)
-        # print('mask: {0}'.format(mask))
-        # print(mask.shape)
-        # print(panorama.shape)
-        # print(dupPanForBlend.shape)
         panorama = sol4_utils.pyramid_blending(panorama, dupPanForBlend, mask,
                                                PYR_LEVEL, DEF_FILTER_IM,
                                                DEF_FILTER_MASK)
-
-
 
     return panorama.astype(np.float32)
 
@@ -960,13 +954,6 @@ def render_panorama1(ims, Hs):
     pan_n_cols = max_x - min_x
     panorama = np.zeros((pan_n_rows, pan_n_cols))
 
-    # print(min_x)
-    # print(min_y)
-    # print(max_x)
-    # print(max_y)
-    # print(pan_boundaries)
-    # print(panorama.shape)
-    # print(pan_strips_boundaries)
     n_ims = len(ims)
     for i in range(n_ims):
         pan_strip_left_boundary, pan_strip_right_boundary = \
@@ -974,10 +961,6 @@ def render_panorama1(ims, Hs):
         im_strip = _calc_im_strip(pan_strip_left_boundary,
                                   pan_strip_right_boundary, min_y, max_y,
                                   ims[i], Hs[i])
-
-        # print('im_strip: '.format(im_strip))
-        # print(im_strip.shape)
-        # print(im_strip[0,0])
 
         # switching to real panorama image coordinates
         left_boundary, right_boundary = pan_strip_left_boundary - min_x, pan_strip_right_boundary - min_x
