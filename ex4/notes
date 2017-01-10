@@ -1,8 +1,6 @@
-2. check if it ok meaning there could not be 2 images with different shapes
-5. check if only 2 the power for blending is good
-6. check if i need to use plt.show() in display matches / panorama example
-7. todo roee please notice that on ransac_homography you return An Array with shape (S,) where S while you return indices of the entire vec!
-8. fix render panorama!!!
-9. check defaults size for everything - meaning change constant!!!
-10. do your own panoramas!
-11. todo tell roee that he might have problem with images (yellow in the middle)
+1. check if it ok meaning there could not be 2 images with different shapes
+2. check if only 2 the power for blending is good
+3. check if i need to use plt.show() in display matches / panorama example
+4. fix render panorama!!!
+5. check defaults size for everything - meaning change constant!!!
+6. do your own panoramas!
