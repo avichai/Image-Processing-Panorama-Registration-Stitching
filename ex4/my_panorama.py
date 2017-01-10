@@ -1,8 +1,9 @@
+from scipy.misc import imsave as imsave
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-import time as time
+import time as time  # todo remove
 from ex4 import sol4
 from ex4 import sol4_utils
 
@@ -51,19 +52,20 @@ def generate_panorama(data_dir, file_prefix, num_images, figsize=(20, 20)):
     panorama = [sol4.render_panorama([im[..., i] for im in ims_rgb], Htot) for i
                 in range(3)]
 
+    # panorama1 = np.dstack(panorama1)
     panorama = np.dstack(panorama)
 
     # plot the panorama
     plt.figure(figsize=figsize)
     plt.imshow(panorama.clip(0, 1))
     print(time.time() - t) #todo rm
+    imsave(os.path.join(data_dir, '%sPanorama.jpg' % file_prefix), panorama)
     plt.show()
 
 
 def main():
-    generate_panorama('external/', 'office', 4)
-    generate_panorama('external/', 'backyard', 3, (20, 10))
-    generate_panorama('external/', 'oxford', 2)
+    generate_panorama('external/', 'room', 4)
+    generate_panorama('external/', 'work', 3)
 
 
 if __name__ == '__main__':
