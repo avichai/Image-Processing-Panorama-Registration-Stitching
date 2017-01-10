@@ -89,7 +89,7 @@ def sample_descriptor(im, pos, desc_rad):
 
         patchI /= normI
         patches[:, :, i] = patchI
-    return patches
+    return patches.astype(np.float32)
 
 
 def find_features(pyr):
