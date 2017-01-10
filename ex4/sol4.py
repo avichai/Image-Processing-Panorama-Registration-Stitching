@@ -17,7 +17,6 @@ from matplotlib import pyplot as plt
 from math import ceil, floor
 
 # ================================= constants =================================
-PYR_LEVEL = 4
 X_DER_KERNEL = np.array([1, 0, -1])[np.newaxis]
 Y_DER_KERNEL = np.transpose(X_DER_KERNEL)
 
@@ -591,6 +590,8 @@ DEFAULT_RADIUS = 12
 DEF_N = 3
 DEF_M = 3
 ITER_FIRST_IMAGE = 0
+EXPAND_FOR_BLEND_FACTOR = 0.4
+PYR_LEVEL = 4
 
 
 def harris_corner_detector(im):
@@ -862,7 +863,7 @@ def accumulate_homographies(H_successive, m):
     return [H2m[:, :, i] for i in range(H2m.shape[2])]
 
 
-def render_panorama1(ims, Hs):
+def render_panorama(ims, Hs):
     '''
     creates a grayscale panorama image composed of vertical strips,
     backwarped using homographies from Hs, one from every image in ims.
@@ -873,18 +874,10 @@ def render_panorama1(ims, Hs):
     :return: − A grayscale panorama image composed of vertical strips,
     backwarped using homographies from Hs, one from every image in ims.
     '''
-
     minX, minY, maxX, maxY, edges, homEdges = getMaxAndMin(ims, Hs)
-    # print(minX)
-    # print(minY)
-    # print(maxX)
-    # print(maxY)
     rows = maxY - minY
     cols = maxX - minX
     panorama = np.zeros((rows, cols))
-    xPanoVals, yPanoVals = np.meshgrid(np.linspace(minX, maxX, cols),
-                                       np.linspace(minY, maxY, rows))
-
     stripesBound = findBounds(ims, homEdges)
 
     for i in range(len(ims)):
@@ -896,42 +889,23 @@ def render_panorama1(ims, Hs):
                                    order=1, prefilter=False)
         imStripe = stripVec.reshape((rows, xRight - xLeft))
 
-        # print('imStripe{0}: '.format(imStripe))
-        # print(imStripe.shape)
-        # print(imStripe[0,0])
-
-
-
         xLeft -= minX
         xRight -= minX
 
         if i == ITER_FIRST_IMAGE:
             panorama[:, xLeft:xRight] = imStripe
             continue
-
         dupPanForBlend = np.zeros(panorama.shape)
         dupPanForBlend[:, xLeft:xRight] = imStripe
+        newL = xLeft
+        newR = stripesBound[i-1][1]-minX
 
-        tmpL = xLeft
-        tmpR = stripesBound[i-1][1]-minX
+        ofset = int((newR - newL) * EXPAND_FOR_BLEND_FACTOR)
+        newL += ofset
+        newR -= ofset
 
-        # print("l: {0} r: {1}".format(tmpL, tmpR))
-
-        off = int((tmpR - tmpL)*0.1) #todo rm
-        tmpL += off#todo rm
-        tmpR -= off#todo rm
-
-        error = np.square(dupPanForBlend[:, xLeft:(stripesBound[i-1][1]-minX)] -
-                          panorama[:, xLeft:(stripesBound[i-1][1]-minX)])
-
-        error = np.square(dupPanForBlend[:, tmpL:tmpR] - #todo rm
-                          panorama[:, tmpL:tmpR])#todo rm
-
-        # print('error: {0}'.format(error))
-        # print(error.shape)
-        # print(error[0,0])
-        # print(error[100,100])
-        # print(error[150,150])
+        error = np.square(dupPanForBlend[:, newL:newR] -
+                          panorama[:, newL:newR])
 
         comulativeError = np.zeros(error.shape)
         root = np.zeros(error.shape, dtype=np.int64)
@@ -948,18 +922,12 @@ def render_panorama1(ims, Hs):
             comulativeError[j, :] = error[j, :] + currErr
             root[j, :] = np.arange(error.shape[COLS]) + currArgErr - 1
 
-        # print(comulativeError[20,20])
-        # print(comulativeError[20,40])
-        # print(comulativeError[60,40])
-        # print(comulativeError.shape)
-
         path[-1] = currPointer = np.argmin(comulativeError[-1, :])
 
         for j in range(1, error.shape[0]):
             path[-1-i] = currPointer = root[-i, currPointer]
 
-        # path = path + xLeft
-        path = path + tmpL #todo rm
+        path = path + newL
 
         mask = np.transpose(np.transpose(np.indices(panorama.shape)[1]) < path)
         # print('mask: {0}'.format(mask))
@@ -967,13 +935,13 @@ def render_panorama1(ims, Hs):
         # print(panorama.shape)
         # print(dupPanForBlend.shape)
         panorama = sol4_utils.pyramid_blending(panorama, dupPanForBlend, mask,
-                                               PYR_LEVEL, 7, 7) #todo change
+                                               PYR_LEVEL, 7, 7)
 
 
 
     return panorama.astype(np.float32)
 
-def render_panorama(ims, Hs):
+def render_panorama1(ims, Hs):
     """
     :param ims: A list of grayscale images
     :param Hs: A list of 3x3 homography matrices. Hs[i] is a homography that transforms points from
