@@ -431,6 +431,7 @@ def getMaxAndMin(ims, Hs):
 
     return [minX, minY, maxX, maxY, edges, xAndy]
 
+
 def render_panorama_rgb(ims, Hs):
     '''
     renders RGB panorama
