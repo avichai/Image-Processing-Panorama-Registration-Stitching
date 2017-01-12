@@ -53,6 +53,8 @@ def generate_panorama(data_dir, file_prefix, num_images, figsize=(20, 20)):
 
     panorama = np.dstack(panorama)
 
+    # panorama = sol4.render_panorama_rgb(ims_rgb, Htot)
+
     # plot the panorama
     plt.figure(figsize=figsize)
     plt.imshow(panorama.clip(0, 1))
